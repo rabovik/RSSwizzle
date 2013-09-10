@@ -8,6 +8,7 @@
 
 #import "RSSwizzle.h"
 #import <objc/runtime.h>
+#import <libkern/OSAtomic.h>
 
 #if !__has_feature(objc_arc)
 #error This code needs ARC. Use compiler option -fobjc-arc
@@ -123,13 +124,6 @@ static BOOL blockIsAnImpFactoryBlock(id block){
 
 #endif // NS_BLOCK_ASSERTIONS
 
-#pragma mark - Runtime Helpers
-
-static const char* instanceMethodType(Class aClass,SEL selector){
-    Method method = class_getInstanceMethod(aClass, selector);
-    if (NULL == method) return NULL;
-    return method_getTypeEncoding(method);
-}
 
 #pragma mark - Swizzling
 
@@ -139,9 +133,9 @@ static const char* instanceMethodType(Class aClass,SEL selector){
                      inClass:(Class)classToSwizzle
                newImpFactory:(RSSwizzleImpFactoryBlock)factoryBlock
 {
-    const char *methodType = instanceMethodType(classToSwizzle, selector);
+    Method method = class_getInstanceMethod(classToSwizzle, selector);
     
-    NSAssert(NULL != methodType,
+    NSAssert(NULL != method,
              @"Selector %@ not found in instance methods of class %@.",
              NSStringFromSelector(selector),
              classToSwizzle);
@@ -149,11 +143,20 @@ static const char* instanceMethodType(Class aClass,SEL selector){
     NSAssert(blockIsAnImpFactoryBlock(factoryBlock),
              @"Wrong type of implementation factory block.");
     
+    __block OSSpinLock lock = OS_SPINLOCK_INIT;
+    // To keep things thread-safe, we fill in the originalIMP later,
+    // with the result of the class_replaceMethod call below.
     __block IMP originalIMP = NULL;
 
     // This block will be called by the client to get original implementation and call it.
     RSSWizzleImpProvider originalImpProvider = ^IMP{
+        // It's possible that another thread can call the method between the call to
+        // class_replaceMethod and its return value being set.
+        // So to be sure originalIMP has the right value, we need a lock.
+        OSSpinLockLock(&lock);
         IMP imp = originalIMP;
+        OSSpinLockUnlock(&lock);
+        
         if (NULL == imp){
             // If the class does not implement the method
             // we need to find an implementation in one of the superclasses.
@@ -168,20 +171,25 @@ static const char* instanceMethodType(Class aClass,SEL selector){
     // call original implementation from the new implementation.
     id newIMPBlock = factoryBlock(originalImpProvider);
     
+    const char *methodType = method_getTypeEncoding(method);
+    
     NSAssert(blockIsCompatibleWithMethodType(newIMPBlock,methodType),
              @"Block returned from factory is not compatible with method type.");
     
     IMP newIMP = imp_implementationWithBlock(newIMPBlock);
     
-    if (!class_addMethod(classToSwizzle, selector, newIMP, methodType)) {
-        // The class already contains a method implementation.
-        Method method = class_getInstanceMethod(classToSwizzle, selector);
-        // We need to store original implementation before setting new implementation
-        // in case method is called at the time of setting.
-        originalIMP = method_getImplementation(method);
-        // We need to store original implementation again, in case it just changed.
-        originalIMP = method_setImplementation(method,newIMP);
-    }
+    // Atomically replace the original method with our new implementation.
+    // This will ensure that if someone else's code on another thread is messing
+    // with the class' method list too, we always have a valid -dealloc at all times.
+    //
+    // If the class does not implement the method itself then
+    // class_replaceMethod returns NULL and superclasses's implementation will be used.
+    //
+    // We need a lock to be sure that originalIMP has the right value in the
+    // originalImpProvider block above.
+    OSSpinLockLock(&lock);
+    originalIMP = class_replaceMethod(classToSwizzle, selector, newIMP, methodType);
+    OSSpinLockUnlock(&lock);
 }
 
 @end
