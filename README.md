@@ -78,7 +78,7 @@ SEL selector = NSSelectorFromString(@"dealloc");
 
 #### Thread safety
 
-**RSSwizzle** is fully thread-safe. You do not need any additional synchronization.
+**RSSwizzle** is fully thread safe. You do not need any additional synchronization.
 
 ## CocoaPods
 Add `RSSwizzle` to your _Podfile_.
