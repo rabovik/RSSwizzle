@@ -75,7 +75,7 @@ typedef NS_ENUM(NSUInteger, RSSwizzleMode) {
      newImpFactory:^id(RSSWizzleInfo *swizzleInfo) {
          // This block will be used as the new implementation.
          return ^int(__unsafe_unretained id self, int num){
-             // You MUST always cast IMP to the correct function pointer.
+             // You MUST always cast implementation to the correct function pointer.
              int (*originalIMP)(__unsafe_unretained id, SEL, int);
              originalIMP = (__typeof(originalIMP))[swizzleInfo getOriginalImplementation];
              // Calling original implementation.
