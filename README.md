@@ -8,8 +8,8 @@ Classical method swizzling with `method_exchangeImplementations` is quite simple
 
 * It is safe only if swizzling is done in the `+load` method. If you need to swizzle methods during application's lifetime you should take into account that third-party code may do swizzling of the same method in another thread at the same time.
 * The swizzled method must be implemented by the class itself and not by superclasses. Workarounds by copying implementation from the superclass do not really work. Original implementation in the superclass must be fetched at the time of calling, not at the time of swizzling <sup>([1][774],[2][775])</sup>.
-* The swizzled method implementation must not rely on the `_cmd` argument. _(And generally you can never be sure in it <sup>([5][cmd])</sup>.)_
-* Naming conflicts are possible <sup>([3][cmd])</sup>.
+* The swizzled method implementation must not rely on the `_cmd` argument. _(And generally you can not be sure in it <sup>([5][cmd])</sup>.)_
+* Naming conflicts are possible <sup>([3][SO])</sup>.
 
 For more details see discussions in: [1][774], [2][775], [3][SO], [4][TH], [5][cmd].
 
@@ -19,7 +19,7 @@ For more details see discussions in: [1][774], [2][775], [3][SO], [4][TH], [5][c
 
 Original implementation must always be called from the new implementation. And because of the the fact that for safe and robust swizzling original implementation must be dynamically fetched at the time of calling and not at the time of swizzling <sup>([1][774],[2][775])</sup>, swizzling API is a little bit complicated.
 
-You should pass a factory block that returns the block for the new implementation of the swizzled method. And use `swizzleInfo` _(factory block's single argument)_ to retrieve and call original implementation.
+You should pass a factory block that returns the block for the new implementation of the swizzled method. And use `swizzleInfo` argument to retrieve and call original implementation.
 
 Example for swizzling `-(int)calculate:(int)number;` method:
 
@@ -50,7 +50,7 @@ Most of the time swizzling goes along with checking whether this particular clas
 Possible mode values:
 
 * `RSSwizzleModeAlways` **RSSwizzle** always does swizzling regardless of the given `key`.
-* `RSSwizzleModeOncePerClass` **RSSwizzle** does not do swizzling if the same class or one of its superclasses have been swizzled earlier with the same `key`.
+* `RSSwizzleModeOncePerClass` **RSSwizzle** does not do swizzling if the same class has been swizzled earlier with the same `key`.
 * `RSSwizzleModeOncePerClassAndSuperclasses` **RSSwizzle** does not do swizzling if the same class or one of its superclasses have been swizzled earlier with the same `key`.
 
 Here is an example of swizzling `-(void)dealloc;` only in case when neither class and no one of its superclasses has been already swizzled with the given `key`:
@@ -75,6 +75,10 @@ SEL selector = NSSelectorFromString(@"dealloc");
 ```
 
 > **Note:** `RSSwizzleModeOncePerClassAndSuperclasses ` mode does not guarantees that your implementation will be called only once per method call. If the order of swizzling is: first inherited class, second superclass; then both swizzlings will be done and the new implementation will be called twice.
+
+#### Thread safety
+
+**RSSwizzle** is fully thread-safe. You do not need any additional synchronization.
 
 ## CocoaPods
 Add `RSSwizzle` to your _Podfile_.
