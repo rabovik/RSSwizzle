@@ -44,22 +44,14 @@ static void swizzleVoidMethod(Class classToSwizzle,
                               SEL selector,
                               dispatch_block_t blockBefore,
                               RSSwizzleMode mode,
-                              const void *key)
-{
-    [RSSwizzle
-     swizzleInstanceMethod:selector
-     inClass:classToSwizzle
-     newImpFactory:^id(RSSwizzleInfo *swizzleInfo) {
+                              const void *key) {
+    [classToSwizzle swizzleInstanceMethod:selector usingFactory:^id (RSSWizzleImpProvider original, Class hookedClass, SEL selector) {
          return ^void(__unsafe_unretained id self){
              blockBefore();
              
-             void (*originalIMP)(__unsafe_unretained id, SEL);
-             originalIMP = (__typeof(originalIMP))[swizzleInfo getOriginalImplementation];
-             originalIMP(self,selector);
+             RSOriginalCast(void, original)(self, selector);
          };
-     }
-     mode:mode
-     key:key];
+     } mode:mode key:key];
 }
 
 static void swizzleDealloc(Class classToSwizzle, dispatch_block_t blockBefore){
@@ -69,20 +61,13 @@ static void swizzleDealloc(Class classToSwizzle, dispatch_block_t blockBefore){
 
 static void swizzleNumber(Class classToSwizzle, int(^transformationBlock)(int)){
     SEL selector = NSSelectorFromString(@"calc:");
-    [RSSwizzle
-     swizzleInstanceMethod:selector
-     inClass:classToSwizzle
-     newImpFactory:^id(RSSwizzleInfo *swizzleInfo) {
+    [classToSwizzle swizzleInstanceMethod:selector usingFactory:^id (RSSWizzleImpProvider original, Class hookedClass, SEL selector) {
          return ^int(__unsafe_unretained id self, int num){
-             int (*originalIMP)(__unsafe_unretained id, SEL, int);
-             originalIMP = (__typeof(originalIMP))[swizzleInfo getOriginalImplementation];
-             int res = originalIMP(self,selector,num);
+             int res = RSOriginalCast(int, original)(self,selector,num);
              
              return transformationBlock(res);
          };
-     }
-     mode:RSSwizzleModeAlways
-     key:NULL];
+     }];
 }
 
 #pragma mark - TESTS -
@@ -93,9 +78,41 @@ static void swizzleNumber(Class classToSwizzle, int(^transformationBlock)(int)){
 
 #pragma mark - Setup
 
+
+
+
 +(void)setUp{
+    //Super easy usage:
+    [UIView swizzleInstanceMethod:@selector(alpha) usingFactory:^id (RSSWizzleImpProvider original, Class hookedClass, SEL selector) {
+        return ^CGFloat (UIView *self) {
+            CGFloat orig = RSOriginalCast(CGFloat, original)(self, selector);
+            
+            return orig+0.5f;
+        };
+    }];
+    
+    [UIView swizzleInstanceMethod:@selector(frame) usingFactory:^id (RSSWizzleImpProvider original, Class hookedClass, SEL selector) {
+        return ^CGRect (UIView *self) {
+            CGRect orig = RSOriginalCast(CGRect, original)(self, selector);
+            
+            orig.origin.x -= 5.0f;
+            orig.origin.y += 5.0f;
+            orig.size.width += +10.0f;
+            orig.size.height += 50.0f;
+            
+            
+            return orig;
+        };
+    }];
+    
+    UIView *v = [UIView new];
+    
+    
+    NSLog(@"VIEW %@", v);
+
     [self swizzleDeallocs];
     [self swizzleCalc];
+    
 }
 
 -(void)setUp{
@@ -179,62 +196,31 @@ static void swizzleNumber(Class classToSwizzle, int(^transformationBlock)(int)){
 #if !defined(NS_BLOCK_ASSERTIONS)
 -(void)testThrowsOnSwizzlingNonexistentMethod{
     SEL selector = NSSelectorFromString(@"nonexistent");
-    RSSwizzleImpFactoryBlock factoryBlock = ^id(RSSwizzleInfo *swizzleInfo){
+    RSSwizzleImpFactoryBlock factoryBlock = ^id (RSSWizzleImpProvider original, Class hookedClass, SEL selector) {
         return ^(__unsafe_unretained id self){
-            void (*originalIMP)(__unsafe_unretained id, SEL);
-            originalIMP = (__typeof(originalIMP))[swizzleInfo getOriginalImplementation];
-            originalIMP(self,selector);
+            RSOriginal(original)(self, selector);
         };
     };
-    STAssertThrows([RSSwizzle
-                    swizzleInstanceMethod:selector
-                    inClass:[RSSwizzleTestClass_A class]
-                    newImpFactory:factoryBlock
-                    mode:RSSwizzleModeAlways
-                    key:NULL], nil);
+    STAssertThrows([[RSSwizzleTestClass_A class] swizzleInstanceMethod:selector usingFactory:factoryBlock], nil);
 }
 
 -(void)testThrowsOnSwizzlingWithIncorrectImpType{
     // Different return types
-    RSSwizzleImpFactoryBlock voidNoArgFactory =
-        ^id(RSSwizzleInfo *swizzleInfo)
-    {
+    RSSwizzleImpFactoryBlock voidNoArgFactory = ^id (RSSWizzleImpProvider original, Class hookedClass, SEL selector) {
         return ^(__unsafe_unretained id self){};
     };
-    STAssertThrows([RSSwizzle
-                    swizzleInstanceMethod:@selector(methodReturningBOOL)
-                    inClass:[RSSwizzleTestClass_A class]
-                    newImpFactory:voidNoArgFactory
-                    mode:RSSwizzleModeAlways
-                    key:NULL], nil);
+    STAssertThrows([[RSSwizzleTestClass_A class] swizzleInstanceMethod:@selector(methodReturningBOOL) usingFactory:voidNoArgFactory], nil);
     // Different arguments count
-    STAssertThrows([RSSwizzle
-                    swizzleInstanceMethod:@selector(methodWithArgument:)
-                    inClass:[RSSwizzleTestClass_A class]
-                    newImpFactory:voidNoArgFactory
-                    mode:RSSwizzleModeAlways
-                    key:NULL], nil);
+    STAssertThrows([[RSSwizzleTestClass_A class] swizzleInstanceMethod:@selector(methodWithArgument:) usingFactory:voidNoArgFactory], nil);
     // Different arguments type
-    RSSwizzleImpFactoryBlock voidIntArgFactory =
-    ^id(RSSwizzleInfo *swizzleInfo)
-    {
+    RSSwizzleImpFactoryBlock voidIntArgFactory = ^id (RSSWizzleImpProvider original, Class hookedClass, SEL selector) {
         return ^int(__unsafe_unretained id self){ return 0; };
     };
-    STAssertThrows([RSSwizzle
-                    swizzleInstanceMethod:@selector(methodWithArgument:)
-                    inClass:[RSSwizzleTestClass_A class]
-                    newImpFactory:voidIntArgFactory
-                    mode:RSSwizzleModeAlways
-                    key:NULL], nil);
+    STAssertThrows([[RSSwizzleTestClass_A class] swizzleInstanceMethod:@selector(methodWithArgument:) usingFactory:voidIntArgFactory], nil);
 }
 
 -(void)testThrowsOnPassingIncorrectImpFactory{
-    STAssertThrows([RSSwizzle
-                    swizzleInstanceMethod:@selector(methodWithArgument:)
-                    inClass:[RSSwizzleTestClass_A class]
-                    newImpFactory:^id(id x){ return nil; }
-                    mode:RSSwizzleModeAlways
-                    key:NULL], nil);
+    STAssertThrows([[RSSwizzleTestClass_A class] swizzleInstanceMethod:@selector(methodWithArgument:) usingFactory:^id (RSSWizzleImpProvider original, Class hookedClass, SEL selector) {return nil;}], nil);
 }
 #endif
 
