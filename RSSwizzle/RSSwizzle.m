@@ -79,8 +79,13 @@ static BOOL blockIsCompatibleWithMethodType(id block, const char *methodType){
     if (blockSignature.numberOfArguments != methodSignature.numberOfArguments){
         return NO;
     }
+    const char *blockReturnType = blockSignature.methodReturnType;
     
-    if (strcmp(blockSignature.methodReturnType, methodSignature.methodReturnType) != 0){
+    if (strncmp(blockReturnType, "@", 1) == 0) {
+        blockReturnType = "@";
+    }
+    
+    if (strcmp(blockReturnType, methodSignature.methodReturnType) != 0) {
         return NO;
     }
     
@@ -98,13 +103,18 @@ static BOOL blockIsCompatibleWithMethodType(id block, const char *methodType){
             if (strcmp([methodSignature getArgumentTypeAtIndex:i], ":") != 0) {
                 return NO;
             }
-            if (strcmp([blockSignature getArgumentTypeAtIndex:i], "@") != 0) {
+            if (strncmp([blockSignature getArgumentTypeAtIndex:i], "@", 1) != 0) {
                 return NO;
             }
-        }else{
-            if (strcmp([methodSignature getArgumentTypeAtIndex:i],
-                       [blockSignature getArgumentTypeAtIndex:i]) != 0)
-            {
+        }
+        else {
+            const char *blockSignatureArg = [blockSignature getArgumentTypeAtIndex:i];
+            
+            if (strncmp(blockSignatureArg, "@", 1) == 0) {
+                blockSignatureArg = "@";
+            }
+            
+            if (strcmp(blockSignatureArg, [methodSignature getArgumentTypeAtIndex:i]) != 0) {
                 return NO;
             }
         }
