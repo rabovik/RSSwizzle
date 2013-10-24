@@ -125,7 +125,7 @@ static BOOL blockIsCompatibleWithMethodType(id block, const char *methodType) {
 
 static BOOL blockIsAnImpFactoryBlock(id block) {
     const char *blockType = blockGetType(block);
-    RSSwizzleImpFactoryBlock dummyFactory = ^id(RSSWizzleImpProvider provider, Class class, SEL selector) {
+    RSSwizzleFactoryBlock dummyFactory = ^ RSSwizzleFactory {
         return nil;
     };
     const char *factoryType = blockGetType(dummyFactory);
@@ -135,9 +135,11 @@ static BOOL blockIsAnImpFactoryBlock(id block) {
 #endif // NS_BLOCK_ASSERTIONS
 
 
+
+
 #pragma mark - Swizzling
 
-static void swizzleCore_Instance(Class classToSwizzle, SEL selector, RSSwizzleImpFactoryBlock factoryBlock) {
+static void swizzleCore_Instance(Class classToSwizzle, SEL selector, RSSwizzleFactoryBlock factoryBlock) {
     Method method = class_getInstanceMethod(classToSwizzle, selector);
     
     NSCAssert(method != NULL, @"Selector %@ not found in instance methods of class %@.", NSStringFromSelector(selector), classToSwizzle);
@@ -150,7 +152,7 @@ static void swizzleCore_Instance(Class classToSwizzle, SEL selector, RSSwizzleIm
     __block IMP originalIMP = NULL;
 
     // This block will be called by the client to get original implementation and call it.
-    RSSWizzleImpProvider originalImpProvider = ^IMP {
+    RSSWizzleIMPProvider originalImpProvider = ^IMP {
         // It's possible that another thread can call the method between the call to
         // class_replaceMethod and its return value being set.
         // So to be sure originalIMP has the right value, we need a lock.
@@ -195,7 +197,7 @@ static void swizzleCore_Instance(Class classToSwizzle, SEL selector, RSSwizzleIm
 }
 
 
-static void swizzleCore_Class(Class classToSwizzle, SEL selector, RSSwizzleImpFactoryBlock factoryBlock) {
+static void swizzleCore_Class(Class classToSwizzle, SEL selector, RSSwizzleFactoryBlock factoryBlock) {
     Method method = class_getClassMethod(classToSwizzle, selector);
     
     NSCAssert(method != NULL, @"Selector %@ not found in class methods of class %@.", NSStringFromSelector(selector), classToSwizzle);
@@ -208,7 +210,7 @@ static void swizzleCore_Class(Class classToSwizzle, SEL selector, RSSwizzleImpFa
     __block IMP originalIMP = NULL;
     
     // This block will be called by the client to get original implementation and call it.
-    RSSWizzleImpProvider originalImpProvider = ^IMP {
+    RSSWizzleIMPProvider originalImpProvider = ^IMP {
         // It's possible that another thread can call the method between the call to
         // class_replaceMethod and its return value being set.
         // So to be sure originalIMP has the right value, we need a lock.
@@ -279,7 +281,7 @@ static NSMutableSet *swizzledClassesForKey(const void *key) {
     return swizzledClasses;
 }
 
-static BOOL swizzleInstanceMethod(SEL selector, __unsafe_unretained Class classToSwizzle, RSSwizzleImpFactoryBlock factoryBlock, RSSwizzleMode mode, const void *key) {
+static BOOL swizzleInstanceMethod(SEL selector, __unsafe_unretained Class classToSwizzle, RSSwizzleFactoryBlock factoryBlock, RSSwizzleMode mode, const void *key) {
     NSCAssert(!(key == NULL && mode != RSSwizzleModeAlways), @"Key may not be NULL if mode is not RSSwizzleModeAlways.");
 
     @synchronized(swizzledClassesDictionary()) {
@@ -310,7 +312,7 @@ static BOOL swizzleInstanceMethod(SEL selector, __unsafe_unretained Class classT
     return YES;
 }
 
-static BOOL swizzleClassMethod(SEL selector, __unsafe_unretained Class classToSwizzle, RSSwizzleImpFactoryBlock factoryBlock, RSSwizzleMode mode, const void *key) {
+static BOOL swizzleClassMethod(SEL selector, __unsafe_unretained Class classToSwizzle, RSSwizzleFactoryBlock factoryBlock, RSSwizzleMode mode, const void *key) {
     NSCAssert(!(key == NULL && mode != RSSwizzleModeAlways), @"Key may not be NULL if mode is not RSSwizzleModeAlways.");
 
     NSCAssert(!(key == NULL && mode != RSSwizzleModeAlways), @"Key may not be NULL if mode is not RSSwizzleModeAlways.");
@@ -348,30 +350,21 @@ static BOOL swizzleClassMethod(SEL selector, __unsafe_unretained Class classToSw
 @implementation NSObject (RSSwizzle)
 
 
-+ (BOOL)swizzleMethod:(SEL)selector usingFactory:(RSSwizzleImpFactoryBlock)factoryBlock {
-    return [self swizzleMethod:selector usingFactory:factoryBlock mode:RSSwizzleModeAlways key:NULL];
++ (void)swizzleClassMethod:(SEL)selector usingFactory:(RSSwizzleFactoryBlock)factoryBlock {
+    [self swizzleClassMethod:selector usingFactory:factoryBlock mode:RSSwizzleModeAlways key:NULL];
 }
 
-+ (BOOL)swizzleMethod:(SEL)selector usingFactory:(RSSwizzleImpFactoryBlock)factoryBlock mode:(RSSwizzleMode)mode key:(const void *)key {
++ (BOOL)swizzleClassMethod:(SEL)selector usingFactory:(RSSwizzleFactoryBlock)factoryBlock mode:(RSSwizzleMode)mode key:(const void *)key {
     return swizzleClassMethod(selector, self, factoryBlock, mode, key);
 }
 
 
-+ (BOOL)swizzleInstanceMethod:(SEL)selector usingFactory:(RSSwizzleImpFactoryBlock)factoryBlock {
-    return [self swizzleInstanceMethod:selector usingFactory:factoryBlock mode:RSSwizzleModeAlways key:NULL];
++ (void)swizzleInstanceMethod:(SEL)selector usingFactory:(RSSwizzleFactoryBlock)factoryBlock {
+    [self swizzleInstanceMethod:selector usingFactory:factoryBlock mode:RSSwizzleModeAlways key:NULL];
 }
 
-+ (BOOL)swizzleInstanceMethod:(SEL)selector usingFactory:(RSSwizzleImpFactoryBlock)factoryBlock mode:(RSSwizzleMode)mode key:(const void *)key {
++ (BOOL)swizzleInstanceMethod:(SEL)selector usingFactory:(RSSwizzleFactoryBlock)factoryBlock mode:(RSSwizzleMode)mode key:(const void *)key {
     return swizzleInstanceMethod(selector, self, factoryBlock, mode, key);
-}
-
-
-- (BOOL)swizzleMethod:(SEL)selector usingFactory:(RSSwizzleImpFactoryBlock)factoryBlock {
-    return [self swizzleMethod:selector usingFactory:factoryBlock mode:RSSwizzleModeAlways key:NULL];
-}
-
-- (BOOL)swizzleMethod:(SEL)selector usingFactory:(RSSwizzleImpFactoryBlock)factoryBlock mode:(RSSwizzleMode)mode key:(const void *)key {
-    return [self.class swizzleInstanceMethod:selector usingFactory:factoryBlock mode:mode key:key];
 }
 
 @end

@@ -194,7 +194,7 @@ static void swizzleNumber(Class classToSwizzle, int(^transformationBlock)(int)){
 #if !defined(NS_BLOCK_ASSERTIONS)
 -(void)testThrowsOnSwizzlingNonexistentMethod{
     SEL selector = NSSelectorFromString(@"nonexistent");
-    RSSwizzleImpFactoryBlock factoryBlock = ^ RSSwizzleFactory {
+    RSSwizzleFactoryBlock factoryBlock = ^ RSSwizzleFactory {
         return ^ RSSwizzleReplacement(, id) {
             RSOriginal(original)(self, selector);
         };
@@ -204,14 +204,14 @@ static void swizzleNumber(Class classToSwizzle, int(^transformationBlock)(int)){
 
 -(void)testThrowsOnSwizzlingWithIncorrectImpType{
     // Different return types
-    RSSwizzleImpFactoryBlock voidNoArgFactory = ^ RSSwizzleFactory {
+    RSSwizzleFactoryBlock voidNoArgFactory = ^ RSSwizzleFactory {
         return ^ RSSwizzleReplacement(, id){};
     };
     STAssertThrows([[RSSwizzleTestClass_A class] swizzleInstanceMethod:@selector(methodReturningBOOL) usingFactory:voidNoArgFactory], nil);
     // Different arguments count
     STAssertThrows([[RSSwizzleTestClass_A class] swizzleInstanceMethod:@selector(methodWithArgument:) usingFactory:voidNoArgFactory], nil);
     // Different arguments type
-    RSSwizzleImpFactoryBlock voidIntArgFactory = ^ RSSwizzleFactory {
+    RSSwizzleFactoryBlock voidIntArgFactory = ^ RSSwizzleFactory {
         return ^ RSSwizzleReplacement(int, id){ return 0; };
     };
     STAssertThrows([[RSSwizzleTestClass_A class] swizzleInstanceMethod:@selector(methodWithArgument:) usingFactory:voidIntArgFactory], nil);
