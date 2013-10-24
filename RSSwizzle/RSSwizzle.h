@@ -81,9 +81,9 @@ typedef NS_ENUM(NSUInteger, RSSwizzleMode) {
  
  [TestClass swizzleClassMethod:@selector(calculate:) usingFactory:^ RSSwizzleFactory {
     //The following block will be used as the new implementation.
-    return ^ RSSwizzleReplacement(int, TestClass *) {
+    return ^ RSSwizzleReplacement(int, TestClass *, int number) {
         //You MUST always cast implementation to the correct function pointer.
-        int orig = RSOriginalCast(int, original)(self, selector);
+        int orig = RSOriginalCast(int, original)(self, selector, number);
  
         //Returning modified return value.
         return orig+1;
@@ -118,9 +118,9 @@ typedef NS_ENUM(NSUInteger, RSSwizzleMode) {
  
  [TestClass swizzleClassMethod:@selector(calculate:) usingFactory:^ RSSwizzleFactory {
     //The following block will be used as the new implementation.
-    return ^ RSSwizzleReplacement(int, TestClass *) {
+    return ^ RSSwizzleReplacement(int, TestClass *, number) {
         //You MUST always cast implementation to the correct function pointer.
-        int orig = RSOriginalCast(int, original)(self, selector);
+        int orig = RSOriginalCast(int, original)(self, selector, number);
  
         //Returning modified return value.
         return orig+1;
@@ -173,9 +173,9 @@ typedef NS_ENUM(NSUInteger, RSSwizzleMode) {
  
  [TestClass swizzleInstanceMethod:@selector(calculate:) usingFactory:^ RSSwizzleFactory {
     //The following block will be used as the new implementation.
-    return ^ RSSwizzleReplacement(int, TestClass *) {
+    return ^ RSSwizzleReplacement(int, TestClass *, int number) {
         //You MUST always cast implementation to the correct function pointer.
-        int orig = RSOriginalCast(int, original)(self, selector);
+        int orig = RSOriginalCast(int, original)(self, selector, number);
  
         //Returning modified return value.
         return orig+1;
@@ -208,9 +208,9 @@ typedef NS_ENUM(NSUInteger, RSSwizzleMode) {
  
  [TestClass swizzleInstanceMethod:@selector(calculate:) usingFactory:^ RSSwizzleFactory {
     //The following block will be used as the new implementation.
-    return ^ RSSwizzleReplacement(int, TestClass *) {
+    return ^ RSSwizzleReplacement(int, TestClass *, int number) {
         //You MUST always cast implementation to the correct function pointer.
-        int orig = RSOriginalCast(int, original)(self, selector);
+        int orig = RSOriginalCast(int, original)(self, selector, number);
  
         //Returning modified return value.
         return orig+1;
