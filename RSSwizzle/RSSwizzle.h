@@ -15,7 +15,7 @@
 #define RSSwizzleReplacement(returntype, selftype, ...) returntype (__unsafe_unretained selftype self, ##__VA_ARGS__)
 
 
-#define RSSwizzleFactory id (RSSWizzleIMPProvider original, __unsafe_unretained Class hookedClass, SEL selector)
+#define RSSwizzleFactory id (RSSWizzleIMPProvider original, __unsafe_unretained Class swizzledClass, SEL selector)
 
 
 #define RSOriginalCast(type, original) ((__typeof(type (*)(__unsafe_unretained id, SEL, ...)))original()) //use for non objc types

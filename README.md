@@ -25,7 +25,7 @@ Example for swizzling `-(int)calculate:(int)number;` method in class `TestClass`
 
 
 ```objective-c
-[TestClass swizzleInstanceMethod:@selector(calculate:) usingFactory:^id (RSSWizzleIMPProvider original, __unsafe_unretained Class hookedClass, SEL selector) {
+[TestClass swizzleInstanceMethod:@selector(calculate:) usingFactory:^id (RSSWizzleIMPProvider original, __unsafe_unretained Class swizzledClass, SEL selector) {
    //The following block will be used as the new implementation.
    return ^int (__unsafe_unretained TestClass *self, int number) {
        //You MUST always cast implementation to the correct function pointer.
@@ -35,7 +35,7 @@ Example for swizzling `-(int)calculate:(int)number;` method in class `TestClass`
        return orig+1;
    };
 }];
-
+```
 
 To simplify that, RSSwizzle offers some very useful macros to help clean up your code:
 
