@@ -19,6 +19,7 @@
 		1A1D75EE17D8CF0D001FDCDC /* RSTestsLog.m in Sources */ = {isa = PBXBuildFile; fileRef = 1A1D75EC17D8CF0D001FDCDC /* RSTestsLog.m */; };
 		1A1D75F117D8D37A001FDCDC /* RSSwizzle.m in Sources */ = {isa = PBXBuildFile; fileRef = 1A1D75F017D8D37A001FDCDC /* RSSwizzle.m */; };
 		1A1D75F217D8D37A001FDCDC /* RSSwizzle.m in Sources */ = {isa = PBXBuildFile; fileRef = 1A1D75F017D8D37A001FDCDC /* RSSwizzle.m */; };
+		DDC3F9F0181985F700B1C7E3 /* CoreGraphics.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = DDC3F9EF181985F700B1C7E3 /* CoreGraphics.framework */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXFileReference section */
@@ -38,6 +39,7 @@
 		1A1D75EC17D8CF0D001FDCDC /* RSTestsLog.m */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.objc; name = RSTestsLog.m; path = RSSwizzleTests/RSTestsLog.m; sourceTree = "<group>"; };
 		1A1D75EF17D8D37A001FDCDC /* RSSwizzle.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; name = RSSwizzle.h; path = ../RSSwizzle/RSSwizzle.h; sourceTree = "<group>"; };
 		1A1D75F017D8D37A001FDCDC /* RSSwizzle.m */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.objc; name = RSSwizzle.m; path = ../RSSwizzle/RSSwizzle.m; sourceTree = "<group>"; };
+		DDC3F9EF181985F700B1C7E3 /* CoreGraphics.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = CoreGraphics.framework; path = Platforms/iPhoneOS.platform/Developer/SDKs/iPhoneOS7.0.sdk/System/Library/Frameworks/CoreGraphics.framework; sourceTree = DEVELOPER_DIR; };
 /* End PBXFileReference section */
 
 /* Begin PBXFrameworksBuildPhase section */
@@ -45,6 +47,7 @@
 			isa = PBXFrameworksBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
+				DDC3F9F0181985F700B1C7E3 /* CoreGraphics.framework in Frameworks */,
 				1A1D75C217D8CD58001FDCDC /* SenTestingKit.framework in Frameworks */,
 				1A1D75C617D8CD58001FDCDC /* UIKit.framework in Frameworks */,
 				1A1D75C417D8CD58001FDCDC /* Foundation.framework in Frameworks */,
@@ -85,6 +88,7 @@
 		1A1D75C017D8CD58001FDCDC /* Frameworks */ = {
 			isa = PBXGroup;
 			children = (
+				DDC3F9EF181985F700B1C7E3 /* CoreGraphics.framework */,
 				1A1D75C117D8CD58001FDCDC /* SenTestingKit.framework */,
 				1A1D75C317D8CD58001FDCDC /* Foundation.framework */,
 				1A1D75C517D8CD58001FDCDC /* UIKit.framework */,

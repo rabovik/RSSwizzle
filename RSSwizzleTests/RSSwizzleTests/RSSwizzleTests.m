@@ -80,37 +80,8 @@ static void swizzleNumber(Class classToSwizzle, int(^transformationBlock)(int)){
 
 
 +(void)setUp{
-    //Super easy usage:
-    [UIView swizzleInstanceMethod:@selector(alpha) usingFactory:^ RSSwizzleFactory {
-        return ^ RSSwizzleReplacement(CGFloat, UIView *) {
-            CGFloat orig = RSOriginalCast(CGFloat, original)(self, selector);
-            
-            return orig+0.5f;
-        };
-    }];
-    
-    [UIView swizzleInstanceMethod:@selector(frame) usingFactory:^ RSSwizzleFactory {
-        return ^ RSSwizzleReplacement(CGRect, UIView *) {
-            CGRect orig = RSOriginalCast(CGRect, original)(self, selector);
-            
-            orig.origin.x -= 5.0f;
-            orig.origin.y += 5.0f;
-            orig.size.width += +10.0f;
-            orig.size.height += 50.0f;
-            
-            
-            return orig;
-        };
-    }];
-    
-    UIView *v = [UIView new];
-    
-    
-    NSLog(@"VIEW %@", v);
-
     [self swizzleDeallocs];
     [self swizzleCalc];
-    
 }
 
 -(void)setUp{
@@ -286,5 +257,66 @@ static void swizzleNumber(Class classToSwizzle, int(^transformationBlock)(int)){
     [object methodForSwizzlingOncePerClassOrSuperClasses];
     ASSERT_LOG_IS(@"A");
 }
+
+
+- (void)testSwizzleClassMethod {
+    [UIImage swizzleClassMethod:@selector(imageNamed:) usingFactory:^ RSSwizzleFactory {
+        return ^ RSSwizzleReplacement(UIImage *, UIImage *, NSString *name) {
+            NSLog(@"Requesting Image named %@", name);
+            
+            return (UIImage *)@"Haha, No!";
+        };
+    }];
+    
+    STAssertEqualObjects(@"Haha, No!", [UIImage imageNamed:@"TEST"], @"-[UIImage imagenNmed:] swizzling failed");
+}
+
+- (void)testSwizzleView {
+    UIView *v = [UIView new];
+    
+    CGRect frame = CGRectMake((CGFloat)arc4random_uniform(50), (CGFloat)arc4random_uniform(50), (CGFloat)arc4random_uniform(50), (CGFloat)arc4random_uniform(50));
+    CGRect swizzledFrame = (CGRect){{frame.origin.x-5.0f, frame.origin.y+5.0f}, {frame.size.width+10.0f, frame.size.height+50.0f}};
+    
+    
+    v.frame = frame;
+    
+    [UIView swizzleInstanceMethod:@selector(frame) usingFactory:^ RSSwizzleFactory {
+        return ^ RSSwizzleReplacement(CGRect, UIView *) {
+            CGRect orig = RSOriginalCast(CGRect, original)(self, selector);
+            
+            orig.origin.x -= 5.0f;
+            orig.origin.y += 5.0f;
+            orig.size.width += 10.0f;
+            orig.size.height += 50.0f;
+            
+            
+            return orig;
+        };
+    }];
+    
+    
+    STAssertEqualObjects(NSStringFromCGRect(v.frame), NSStringFromCGRect(swizzledFrame), @"-[UIView frame] swizzling failed");
+    
+    NSUInteger random = arc4random_uniform(50);
+    
+    CGFloat alpha = random/100.0f;
+    
+    [UIView swizzleInstanceMethod:@selector(alpha) usingFactory:^ RSSwizzleFactory {
+        return ^ RSSwizzleReplacement(CGFloat, UIView *) {
+            CGFloat orig = RSOriginalCast(CGFloat, original)(self, selector);
+            
+            return (orig > 0.5f ? orig-alpha : orig+alpha);
+        };
+    }];
+    
+    CGFloat setAlpha = (CGFloat)arc4random_uniform(100)/100.0f;
+    
+    v.alpha = setAlpha;
+    
+    CGFloat swizzledAlpha = (CGFloat)(setAlpha > 0.5f ? setAlpha-alpha : setAlpha+alpha);
+    
+    STAssertEquals(v.alpha, swizzledAlpha, @"-[UIView alpha] swizzling failed");
+}
+
 
 @end
