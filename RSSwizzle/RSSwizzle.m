@@ -44,7 +44,7 @@ enum {
 };
 typedef int BlockFlags;
 
-static const char *blockGetType(id block){
+NS_INLINE const char *blockGetType(id block) {
     struct Block_literal_1 *blockRef = (__bridge struct Block_literal_1 *)block;
     BlockFlags flags = blockRef->flags;
     
@@ -65,27 +65,31 @@ static const char *blockGetType(id block){
     return NULL;
 }
 
-static BOOL blockIsCompatibleWithMethodType(id block, const char *methodType){
+NS_INLINE BOOL blockIsCompatibleWithMethodType(id block, const char *methodType) {
     const char *blockType = blockGetType(block);
-    NSMethodSignature *blockSignature =
-        [NSMethodSignature signatureWithObjCTypes:blockType];
-    NSMethodSignature *methodSignature =
-        [NSMethodSignature signatureWithObjCTypes:methodType];
+    
+    NSMethodSignature *blockSignature = [NSMethodSignature signatureWithObjCTypes:blockType];
+    NSMethodSignature *methodSignature = [NSMethodSignature signatureWithObjCTypes:methodType];
     
     if (!blockSignature || !methodSignature) {
         return NO;
     }
     
-    if (blockSignature.numberOfArguments != methodSignature.numberOfArguments){
+    if (blockSignature.numberOfArguments != methodSignature.numberOfArguments) {
+        return NO;
+    }
+    const char *blockReturnType = blockSignature.methodReturnType;
+    
+    if (strncmp(blockReturnType, "@", 1) == 0) {
+        blockReturnType = "@";
+    }
+    
+    if (strcmp(blockReturnType, methodSignature.methodReturnType) != 0) {
         return NO;
     }
     
-    if (strcmp(blockSignature.methodReturnType, methodSignature.methodReturnType) != 0){
-        return NO;
-    }
-    
-    for (int i=0; i<methodSignature.numberOfArguments; ++i){
-        if (i == 0){
+    for (unsigned int i = 0; i < methodSignature.numberOfArguments; i++) {
+        if (i == 0) {
             // self in method, block in block
             if (strcmp([methodSignature getArgumentTypeAtIndex:i], "@") != 0) {
                 return NO;
@@ -93,18 +97,24 @@ static BOOL blockIsCompatibleWithMethodType(id block, const char *methodType){
             if (strcmp([blockSignature getArgumentTypeAtIndex:i], "@?") != 0) {
                 return NO;
             }
-        }else if(i == 1){
+        }
+        else if(i == 1) {
             // SEL in method, self in block
             if (strcmp([methodSignature getArgumentTypeAtIndex:i], ":") != 0) {
                 return NO;
             }
-            if (strcmp([blockSignature getArgumentTypeAtIndex:i], "@") != 0) {
+            if (strncmp([blockSignature getArgumentTypeAtIndex:i], "@", 1) != 0) {
                 return NO;
             }
-        }else{
-            if (strcmp([methodSignature getArgumentTypeAtIndex:i],
-                       [blockSignature getArgumentTypeAtIndex:i]) != 0)
-            {
+        }
+        else {
+            const char *blockSignatureArg = [blockSignature getArgumentTypeAtIndex:i];
+            
+            if (strncmp(blockSignatureArg, "@", 1) == 0) {
+                blockSignatureArg = "@";
+            }
+            
+            if (strcmp(blockSignatureArg, [methodSignature getArgumentTypeAtIndex:i]) != 0) {
                 return NO;
             }
         }
@@ -113,54 +123,28 @@ static BOOL blockIsCompatibleWithMethodType(id block, const char *methodType){
     return YES;
 }
 
-static BOOL blockIsAnImpFactoryBlock(id block){
+NS_INLINE BOOL blockIsAnImpFactoryBlock(id block) {
     const char *blockType = blockGetType(block);
-    RSSwizzleImpFactoryBlock dummyFactory = ^id(RSSwizzleInfo *swizzleInfo){
+    RSSwizzleFactoryBlock dummyFactory = ^ RSSwizzleFactory {
         return nil;
     };
     const char *factoryType = blockGetType(dummyFactory);
-    return 0 == strcmp(factoryType, blockType);
+    return (strcmp(factoryType, blockType) == 0);
 }
 
 #endif // NS_BLOCK_ASSERTIONS
 
 
+
+
 #pragma mark - Swizzling
 
-#pragma mark └ RSSwizzleInfo
-typedef IMP (^RSSWizzleImpProvider)(void);
-
-@interface RSSwizzleInfo()
-@property (nonatomic,copy) RSSWizzleImpProvider impProviderBlock;
-@end
-
-@implementation RSSwizzleInfo
-
--(RSSwizzleOriginalIMP)getOriginalImplementation{
-    NSAssert(self.impProviderBlock,nil);
-    // Casting IMP to RSSwizzleOriginalIMP to force user casting.
-    return (RSSwizzleOriginalIMP)self.impProviderBlock();
-}
-
-@end
-
-
-#pragma mark └ RSSwizzle
-@implementation RSSwizzle
-
-static void swizzle(Class classToSwizzle,
-                    SEL selector,
-                    RSSwizzleImpFactoryBlock factoryBlock)
-{
+NS_INLINE void swizzleCore_Instance(Class classToSwizzle, SEL selector, RSSwizzleFactoryBlock factoryBlock) {
     Method method = class_getInstanceMethod(classToSwizzle, selector);
     
-    NSCAssert(NULL != method,
-             @"Selector %@ not found in instance methods of class %@.",
-             NSStringFromSelector(selector),
-             classToSwizzle);
+    NSCAssert(method != NULL, @"Selector %@ not found in instance methods of class %@.", NSStringFromSelector(selector), classToSwizzle);
     
-    NSCAssert(blockIsAnImpFactoryBlock(factoryBlock),
-             @"Wrong type of implementation factory block.");
+    NSCAssert(blockIsAnImpFactoryBlock(factoryBlock), @"Wrong type of implementation factory block.");
     
     __block OSSpinLock lock = OS_SPINLOCK_INIT;
     // To keep things thread-safe, we fill in the originalIMP later,
@@ -168,7 +152,7 @@ static void swizzle(Class classToSwizzle,
     __block IMP originalIMP = NULL;
 
     // This block will be called by the client to get original implementation and call it.
-    RSSWizzleImpProvider originalImpProvider = ^IMP{
+    RSSWizzleIMPProvider originalImpProvider = ^IMP {
         // It's possible that another thread can call the method between the call to
         // class_replaceMethod and its return value being set.
         // So to be sure originalIMP has the right value, we need a lock.
@@ -176,27 +160,31 @@ static void swizzle(Class classToSwizzle,
         IMP imp = originalIMP;
         OSSpinLockUnlock(&lock);
         
-        if (NULL == imp){
-            // If the class does not implement the method
-            // we need to find an implementation in one of the superclasses.
+        if (imp == NULL) {
             Class superclass = class_getSuperclass(classToSwizzle);
-            imp = method_getImplementation(class_getInstanceMethod(superclass,selector));
+            while (imp == NULL) {
+                // If the class does not implement the method
+                // we need to find an implementation in one of the superclasses.
+                imp = method_getImplementation(class_getInstanceMethod(superclass, selector));
+                
+                if (imp == NULL) {
+                    superclass = class_getSuperclass(superclass);
+                }
+            }
         }
         return imp;
     };
     
-    RSSwizzleInfo *swizzleInfo = [RSSwizzleInfo new];
-    swizzleInfo.impProviderBlock = originalImpProvider;
-    
     // We ask the client for the new implementation block.
     // We pass swizzleInfo as an argument to factory block, so the client can
     // call original implementation from the new implementation.
-    id newIMPBlock = factoryBlock(swizzleInfo);
+    id newIMPBlock = factoryBlock(originalImpProvider, classToSwizzle, selector);
+    
+    NSCAssert(newIMPBlock, @"Block returned from factory cannot be nil.");
     
     const char *methodType = method_getTypeEncoding(method);
     
-    NSCAssert(blockIsCompatibleWithMethodType(newIMPBlock,methodType),
-             @"Block returned from factory is not compatible with method type.");
+    NSCAssert(blockIsCompatibleWithMethodType(newIMPBlock, methodType), @"Block returned from factory is not compatible with method type.");
     
     IMP newIMP = imp_implementationWithBlock(newIMPBlock);
     
@@ -214,7 +202,77 @@ static void swizzle(Class classToSwizzle,
     OSSpinLockUnlock(&lock);
 }
 
-static NSMutableDictionary *swizzledClassesDictionary(){
+
+NS_INLINE void swizzleCore_Class(Class classToSwizzle, SEL selector, RSSwizzleFactoryBlock factoryBlock) {
+    Method method = class_getClassMethod(classToSwizzle, selector);
+    
+    NSCAssert(method != NULL, @"Selector %@ not found in class methods of class %@.", NSStringFromSelector(selector), classToSwizzle);
+    
+    NSCAssert(blockIsAnImpFactoryBlock(factoryBlock), @"Wrong type of implementation factory block.");
+    
+    __block OSSpinLock lock = OS_SPINLOCK_INIT;
+    // To keep things thread-safe, we fill in the originalIMP later,
+    // with the result of the class_replaceMethod call below.
+    __block IMP originalIMP = NULL;
+    
+    // This block will be called by the client to get original implementation and call it.
+    RSSWizzleIMPProvider originalImpProvider = ^IMP {
+        // It's possible that another thread can call the method between the call to
+        // class_replaceMethod and its return value being set.
+        // So to be sure originalIMP has the right value, we need a lock.
+        OSSpinLockLock(&lock);
+        IMP imp = originalIMP;
+        OSSpinLockUnlock(&lock);
+        
+        if (imp == NULL) {
+            // If the class does not implement the method
+            // we need to find an implementation in one of the superclasses.
+            if (imp == NULL) {
+                Class superclass = class_getSuperclass(classToSwizzle);
+                while (imp == NULL) {
+                    // If the class does not implement the method
+                    // we need to find an implementation in one of the superclasses.
+                    imp = method_getImplementation(class_getClassMethod(superclass, selector));
+                    
+                    if (imp == NULL) {
+                        superclass = class_getSuperclass(superclass);
+                    }
+                }
+            }
+        }
+        
+        return imp;
+    };
+    
+    // We ask the client for the new implementation block.
+    // We pass swizzleInfo as an argument to factory block, so the client can
+    // call original implementation from the new implementation.
+    id newIMPBlock = factoryBlock(originalImpProvider, classToSwizzle, selector);
+    
+    const char *methodType = method_getTypeEncoding(method);
+    
+    NSCAssert(blockIsCompatibleWithMethodType(newIMPBlock, methodType), @"Block returned from factory is not compatible with method type.");
+    
+    IMP newIMP = imp_implementationWithBlock(newIMPBlock);
+    
+    // Atomically replace the original method with our new implementation.
+    // This will ensure that if someone else's code on another thread is messing
+    // with the class' method list too, we always have a valid -dealloc at all times.
+    //
+    // If the class does not implement the method itself then
+    // class_replaceMethod returns NULL and superclasses's implementation will be used.
+    //
+    // We need a lock to be sure that originalIMP has the right value in the
+    // originalImpProvider block above.
+    OSSpinLockLock(&lock);
+    originalIMP = class_replaceMethod(object_getClass(classToSwizzle), selector, newIMP, methodType);
+    OSSpinLockUnlock(&lock);
+}
+
+
+
+
+static NSMutableDictionary *swizzledClassesDictionary() {
     static NSMutableDictionary *swizzledClasses;
     static dispatch_once_t onceToken;
     dispatch_once(&onceToken, ^{
@@ -223,38 +281,36 @@ static NSMutableDictionary *swizzledClassesDictionary(){
     return swizzledClasses;
 }
 
-static NSMutableSet *swizzledClassesForKey(const void *key){
+NS_INLINE NSMutableSet *swizzledClassesForKey(const void *key) {
     NSMutableDictionary *classesDictionary = swizzledClassesDictionary();
+    
     NSValue *keyValue = [NSValue valueWithPointer:key];
+    
+    
     NSMutableSet *swizzledClasses = [classesDictionary objectForKey:keyValue];
+    
     if (!swizzledClasses) {
         swizzledClasses = [NSMutableSet new];
         [classesDictionary setObject:swizzledClasses forKey:keyValue];
     }
+    
     return swizzledClasses;
 }
 
-+(BOOL)swizzleInstanceMethod:(SEL)selector
-                     inClass:(Class)classToSwizzle
-               newImpFactory:(RSSwizzleImpFactoryBlock)factoryBlock
-                        mode:(RSSwizzleMode)mode
-                         key:(const void *)key
-{
-    NSAssert(!(NULL == key && RSSwizzleModeAlways != mode),
-             @"Key may not be NULL if mode is not RSSwizzleModeAlways.");
+NS_INLINE BOOL swizzleInstanceMethod(SEL selector, __unsafe_unretained Class classToSwizzle, RSSwizzleFactoryBlock factoryBlock, RSSwizzleMode mode, const void *key) {
+    NSCAssert(!(key == NULL && mode != RSSwizzleModeAlways), @"Key may not be NULL if mode is not RSSwizzleModeAlways.");
 
-    @synchronized(swizzledClassesDictionary()){
-        if (key){
+    @synchronized(swizzledClassesDictionary()) {
+        if (key) {
             NSSet *swizzledClasses = swizzledClassesForKey(key);
+            
             if (mode == RSSwizzleModeOncePerClass) {
-                if ([swizzledClasses containsObject:classToSwizzle]){
+                if ([swizzledClasses containsObject:classToSwizzle]) {
                     return NO;
                 }
-            }else if (mode == RSSwizzleModeOncePerClassAndSuperclasses){
-                for (Class currentClass = classToSwizzle;
-                     nil != currentClass;
-                     currentClass = class_getSuperclass(currentClass))
-                {
+            }
+            else if (mode == RSSwizzleModeOncePerClassAndSuperclasses) {
+                for (Class currentClass = classToSwizzle; currentClass != nil; currentClass = class_getSuperclass(currentClass)) {
                     if ([swizzledClasses containsObject:currentClass]) {
                         return NO;
                     }
@@ -262,9 +318,9 @@ static NSMutableSet *swizzledClassesForKey(const void *key){
             }
         }
         
-        swizzle(classToSwizzle, selector, factoryBlock);
+        swizzleCore_Instance(classToSwizzle, selector, factoryBlock);
         
-        if (key){
+        if (key) {
             [swizzledClassesForKey(key) addObject:classToSwizzle];
         }
     }
@@ -272,4 +328,60 @@ static NSMutableSet *swizzledClassesForKey(const void *key){
     return YES;
 }
 
+NS_INLINE BOOL swizzleClassMethod(SEL selector, __unsafe_unretained Class classToSwizzle, RSSwizzleFactoryBlock factoryBlock, RSSwizzleMode mode, const void *key) {
+    NSCAssert(!(key == NULL && mode != RSSwizzleModeAlways), @"Key may not be NULL if mode is not RSSwizzleModeAlways.");
+
+    NSCAssert(!(key == NULL && mode != RSSwizzleModeAlways), @"Key may not be NULL if mode is not RSSwizzleModeAlways.");
+    
+    @synchronized(swizzledClassesDictionary()) {
+        if (key) {
+            NSSet *swizzledClasses = swizzledClassesForKey(key);
+            
+            if (mode == RSSwizzleModeOncePerClass) {
+                if ([swizzledClasses containsObject:classToSwizzle]) {
+                    return NO;
+                }
+            }
+            else if (mode == RSSwizzleModeOncePerClassAndSuperclasses) {
+                for (Class currentClass = classToSwizzle; currentClass != nil; currentClass = class_getSuperclass(currentClass)) {
+                    if ([swizzledClasses containsObject:currentClass]) {
+                        return NO;
+                    }
+                }
+            }
+        }
+        
+        swizzleCore_Class(classToSwizzle, selector, factoryBlock);
+        
+        if (key) {
+            [swizzledClassesForKey(key) addObject:classToSwizzle];
+        }
+    }
+    
+    return YES;
+}
+
+
+
+@implementation NSObject (RSSwizzle)
+
+
++ (void)swizzleClassMethod:(SEL)selector usingFactory:(RSSwizzleFactoryBlock)factoryBlock {
+    [self swizzleClassMethod:selector usingFactory:factoryBlock mode:RSSwizzleModeAlways key:NULL];
+}
+
++ (BOOL)swizzleClassMethod:(SEL)selector usingFactory:(RSSwizzleFactoryBlock)factoryBlock mode:(RSSwizzleMode)mode key:(const void *)key {
+    return swizzleClassMethod(selector, self, factoryBlock, mode, key);
+}
+
+
++ (void)swizzleInstanceMethod:(SEL)selector usingFactory:(RSSwizzleFactoryBlock)factoryBlock {
+    [self swizzleInstanceMethod:selector usingFactory:factoryBlock mode:RSSwizzleModeAlways key:NULL];
+}
+
++ (BOOL)swizzleInstanceMethod:(SEL)selector usingFactory:(RSSwizzleFactoryBlock)factoryBlock mode:(RSSwizzleMode)mode key:(const void *)key {
+    return swizzleInstanceMethod(selector, self, factoryBlock, mode, key);
+}
+
 @end
+

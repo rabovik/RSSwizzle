@@ -21,27 +21,35 @@ Original implementation must always be called from the new implementation. And b
 
 You should pass a factory block that returns the block for the new implementation of the swizzled method. And use `swizzleInfo` argument to retrieve and call original implementation.
 
-Example for swizzling `-(int)calculate:(int)number;` method:
+Example for swizzling `-(int)calculate:(int)number;` method in class `TestClass`:
+
 
 ```objective-c
-SEL selector = @selector(calculate:);
-[RSSwizzle
- swizzleInstanceMethod:selector
- inClass:classToSwizzle
- newImpFactory:^id(RSSWizzleInfo *swizzleInfo) {
-     // This block will be used as the new implementation.
-     return ^int(__unsafe_unretained id self, int num){
-         // You MUST always cast implementation to the correct function pointer.
-         int (*originalIMP)(__unsafe_unretained id, SEL, int);
-         originalIMP = (__typeof(originalIMP))[swizzleInfo getOriginalImplementation];
-         // Calling original implementation.
-         int res = originalIMP(self,selector,num);
-         // Returning modified return value.
-         return res + 1;
-     };
- }
- mode:RSSwizzleModeAlways
- key:NULL];
+[TestClass swizzleInstanceMethod:@selector(calculate:) usingFactory:^id (RSSWizzleIMPProvider original, __unsafe_unretained Class swizzledClass, SEL selector) {
+   //The following block will be used as the new implementation.
+   return ^int (__unsafe_unretained TestClass *self, int number) {
+       //You MUST always cast implementation to the correct function pointer.
+       int orig = ((__typeof(int (*)(__unsafe_unretained id, SEL, ...)))original())(self, selector, number);
+
+       //Returning modified return value.
+       return orig+1;
+   };
+}];
+```
+
+To simplify that, RSSwizzle offers some very useful macros to help clean up your code:
+
+```objective-c
+[TestClass swizzleInstanceMethod:@selector(calculate:) usingFactory:^ RSSwizzleFactory {
+   //The following block will be used as the new implementation.
+   return ^ RSSwizzleReplacement(int, TestClass *, int number) {
+       //You MUST always cast implementation to the correct function pointer.
+       int orig = RSOriginalCast(int, original)(self, selector, number);
+
+       //Returning modified return value.
+       return orig+1;
+   };
+}];
 ```
 
 #### Modes
@@ -57,21 +65,12 @@ Here is an example of swizzling `-(void)dealloc;` only in case when neither clas
 
 ```objective-c
 static const void *key = &key;
-SEL selector = NSSelectorFromString(@"dealloc");
-[RSSwizzle
- swizzleInstanceMethod:selector
- inClass:classToSwizzle
- newImpFactory:^id(RSSWizzleInfo *swizzleInfo) {
-     return ^void(__unsafe_unretained id self){
-         NSLog(@"Deallocating %@.",self);
-         
-         void (*originalIMP)(__unsafe_unretained id, SEL);
-         originalIMP = (__typeof(originalIMP))[swizzleInfo getOriginalImplementation];
-         originalIMP(self,selector);
-     };
- }
- mode:RSSwizzleModeOncePerClassAndSuperclasses
- key:key];
+[TestClass swizzleInstanceMethod:@selector(calculate:) usingFactory:^ RSSwizzleFactory {
+   return ^ RSSwizzleReplacement(int, TestClass *) {
+       NSLog(@"Deallocating %@.",self);
+       RSOriginalVoid(original)(self, selector);
+   };
+} mode:RSSwizzleModeOncePerClassAndSuperclasses key:key];
 ```
 
 > **Note:** `RSSwizzleModeOncePerClassAndSuperclasses ` mode does not guarantees that your implementation will be called only once per method call. If the order of swizzling is: first inherited class, second superclass; then both swizzlings will be done and the new implementation will be called twice.

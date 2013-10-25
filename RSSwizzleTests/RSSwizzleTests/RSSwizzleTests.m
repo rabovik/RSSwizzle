@@ -44,22 +44,14 @@ static void swizzleVoidMethod(Class classToSwizzle,
                               SEL selector,
                               dispatch_block_t blockBefore,
                               RSSwizzleMode mode,
-                              const void *key)
-{
-    [RSSwizzle
-     swizzleInstanceMethod:selector
-     inClass:classToSwizzle
-     newImpFactory:^id(RSSwizzleInfo *swizzleInfo) {
-         return ^void(__unsafe_unretained id self){
+                              const void *key) {
+    [classToSwizzle swizzleInstanceMethod:selector usingFactory:^ RSSwizzleFactory {
+         return ^ RSSwizzleReplacement(, id) {
              blockBefore();
              
-             void (*originalIMP)(__unsafe_unretained id, SEL);
-             originalIMP = (__typeof(originalIMP))[swizzleInfo getOriginalImplementation];
-             originalIMP(self,selector);
+             RSOriginalVoid(original)(self, selector);
          };
-     }
-     mode:mode
-     key:key];
+     } mode:mode key:key];
 }
 
 static void swizzleDealloc(Class classToSwizzle, dispatch_block_t blockBefore){
@@ -69,20 +61,13 @@ static void swizzleDealloc(Class classToSwizzle, dispatch_block_t blockBefore){
 
 static void swizzleNumber(Class classToSwizzle, int(^transformationBlock)(int)){
     SEL selector = NSSelectorFromString(@"calc:");
-    [RSSwizzle
-     swizzleInstanceMethod:selector
-     inClass:classToSwizzle
-     newImpFactory:^id(RSSwizzleInfo *swizzleInfo) {
-         return ^int(__unsafe_unretained id self, int num){
-             int (*originalIMP)(__unsafe_unretained id, SEL, int);
-             originalIMP = (__typeof(originalIMP))[swizzleInfo getOriginalImplementation];
-             int res = originalIMP(self,selector,num);
+    [classToSwizzle swizzleInstanceMethod:selector usingFactory:^ RSSwizzleFactory {
+         return ^ RSSwizzleReplacement(int, id, int num) {
+             int res = RSOriginalCast(int, original)(self, selector, num);
              
              return transformationBlock(res);
          };
-     }
-     mode:RSSwizzleModeAlways
-     key:NULL];
+     }];
 }
 
 #pragma mark - TESTS -
@@ -92,6 +77,7 @@ static void swizzleNumber(Class classToSwizzle, int(^transformationBlock)(int)){
 @implementation RSSwizzleTests
 
 #pragma mark - Setup
+
 
 +(void)setUp{
     [self swizzleDeallocs];
@@ -179,62 +165,31 @@ static void swizzleNumber(Class classToSwizzle, int(^transformationBlock)(int)){
 #if !defined(NS_BLOCK_ASSERTIONS)
 -(void)testThrowsOnSwizzlingNonexistentMethod{
     SEL selector = NSSelectorFromString(@"nonexistent");
-    RSSwizzleImpFactoryBlock factoryBlock = ^id(RSSwizzleInfo *swizzleInfo){
-        return ^(__unsafe_unretained id self){
-            void (*originalIMP)(__unsafe_unretained id, SEL);
-            originalIMP = (__typeof(originalIMP))[swizzleInfo getOriginalImplementation];
-            originalIMP(self,selector);
+    RSSwizzleFactoryBlock factoryBlock = ^ RSSwizzleFactory {
+        return ^ RSSwizzleReplacement(, id) {
+            RSOriginal(original)(self, selector);
         };
     };
-    STAssertThrows([RSSwizzle
-                    swizzleInstanceMethod:selector
-                    inClass:[RSSwizzleTestClass_A class]
-                    newImpFactory:factoryBlock
-                    mode:RSSwizzleModeAlways
-                    key:NULL], nil);
+    STAssertThrows([[RSSwizzleTestClass_A class] swizzleInstanceMethod:selector usingFactory:factoryBlock], nil);
 }
 
 -(void)testThrowsOnSwizzlingWithIncorrectImpType{
     // Different return types
-    RSSwizzleImpFactoryBlock voidNoArgFactory =
-        ^id(RSSwizzleInfo *swizzleInfo)
-    {
-        return ^(__unsafe_unretained id self){};
+    RSSwizzleFactoryBlock voidNoArgFactory = ^ RSSwizzleFactory {
+        return ^ RSSwizzleReplacement(, id){};
     };
-    STAssertThrows([RSSwizzle
-                    swizzleInstanceMethod:@selector(methodReturningBOOL)
-                    inClass:[RSSwizzleTestClass_A class]
-                    newImpFactory:voidNoArgFactory
-                    mode:RSSwizzleModeAlways
-                    key:NULL], nil);
+    STAssertThrows([[RSSwizzleTestClass_A class] swizzleInstanceMethod:@selector(methodReturningBOOL) usingFactory:voidNoArgFactory], nil);
     // Different arguments count
-    STAssertThrows([RSSwizzle
-                    swizzleInstanceMethod:@selector(methodWithArgument:)
-                    inClass:[RSSwizzleTestClass_A class]
-                    newImpFactory:voidNoArgFactory
-                    mode:RSSwizzleModeAlways
-                    key:NULL], nil);
+    STAssertThrows([[RSSwizzleTestClass_A class] swizzleInstanceMethod:@selector(methodWithArgument:) usingFactory:voidNoArgFactory], nil);
     // Different arguments type
-    RSSwizzleImpFactoryBlock voidIntArgFactory =
-    ^id(RSSwizzleInfo *swizzleInfo)
-    {
-        return ^int(__unsafe_unretained id self){ return 0; };
+    RSSwizzleFactoryBlock voidIntArgFactory = ^ RSSwizzleFactory {
+        return ^ RSSwizzleReplacement(int, id){ return 0; };
     };
-    STAssertThrows([RSSwizzle
-                    swizzleInstanceMethod:@selector(methodWithArgument:)
-                    inClass:[RSSwizzleTestClass_A class]
-                    newImpFactory:voidIntArgFactory
-                    mode:RSSwizzleModeAlways
-                    key:NULL], nil);
+    STAssertThrows([[RSSwizzleTestClass_A class] swizzleInstanceMethod:@selector(methodWithArgument:) usingFactory:voidIntArgFactory], nil);
 }
 
 -(void)testThrowsOnPassingIncorrectImpFactory{
-    STAssertThrows([RSSwizzle
-                    swizzleInstanceMethod:@selector(methodWithArgument:)
-                    inClass:[RSSwizzleTestClass_A class]
-                    newImpFactory:^id(id x){ return nil; }
-                    mode:RSSwizzleModeAlways
-                    key:NULL], nil);
+    STAssertThrows([[RSSwizzleTestClass_A class] swizzleInstanceMethod:@selector(methodWithArgument:) usingFactory:^ RSSwizzleFactory {return nil;}], nil);
 }
 #endif
 
@@ -302,5 +257,66 @@ static void swizzleNumber(Class classToSwizzle, int(^transformationBlock)(int)){
     [object methodForSwizzlingOncePerClassOrSuperClasses];
     ASSERT_LOG_IS(@"A");
 }
+
+
+- (void)testSwizzleClassMethod {
+    [UIImage swizzleClassMethod:@selector(imageNamed:) usingFactory:^ RSSwizzleFactory {
+        return ^ RSSwizzleReplacement(UIImage *, UIImage *, NSString *name) {
+            NSLog(@"Requesting Image named %@", name);
+            
+            return (UIImage *)@"Haha, No!";
+        };
+    }];
+    
+    STAssertEqualObjects(@"Haha, No!", [UIImage imageNamed:@"TEST"], @"-[UIImage imagenNmed:] swizzling failed");
+}
+
+- (void)testSwizzleView {
+    UIView *v = [UIView new];
+    
+    CGRect frame = CGRectMake((CGFloat)arc4random_uniform(50), (CGFloat)arc4random_uniform(50), (CGFloat)arc4random_uniform(50), (CGFloat)arc4random_uniform(50));
+    CGRect swizzledFrame = (CGRect){{frame.origin.x-5.0f, frame.origin.y+5.0f}, {frame.size.width+10.0f, frame.size.height+50.0f}};
+    
+    
+    v.frame = frame;
+    
+    [UIView swizzleInstanceMethod:@selector(frame) usingFactory:^ RSSwizzleFactory {
+        return ^ RSSwizzleReplacement(CGRect, UIView *) {
+            CGRect orig = RSOriginalCast(CGRect, original)(self, selector);
+            
+            orig.origin.x -= 5.0f;
+            orig.origin.y += 5.0f;
+            orig.size.width += 10.0f;
+            orig.size.height += 50.0f;
+            
+            
+            return orig;
+        };
+    }];
+    
+    
+    STAssertEqualObjects(NSStringFromCGRect(v.frame), NSStringFromCGRect(swizzledFrame), @"-[UIView frame] swizzling failed");
+    
+    NSUInteger random = arc4random_uniform(50);
+    
+    CGFloat alpha = random/100.0f;
+    
+    [UIView swizzleInstanceMethod:@selector(alpha) usingFactory:^ RSSwizzleFactory {
+        return ^ RSSwizzleReplacement(CGFloat, UIView *) {
+            CGFloat orig = RSOriginalCast(CGFloat, original)(self, selector);
+            
+            return (orig > 0.5f ? orig-alpha : orig+alpha);
+        };
+    }];
+    
+    CGFloat setAlpha = (CGFloat)arc4random_uniform(100)/100.0f;
+    
+    v.alpha = setAlpha;
+    
+    CGFloat swizzledAlpha = (CGFloat)(setAlpha > 0.5f ? setAlpha-alpha : setAlpha+alpha);
+    
+    STAssertEquals(v.alpha, swizzledAlpha, @"-[UIView alpha] swizzling failed");
+}
+
 
 @end
