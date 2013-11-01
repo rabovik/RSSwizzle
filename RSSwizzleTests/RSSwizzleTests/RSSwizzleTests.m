@@ -21,6 +21,7 @@
 -(void)methodForAlwaysSwizzling{};
 -(void)methodForSwizzlingOncePerClass{};
 -(void)methodForSwizzlingOncePerClassOrSuperClasses{};
+-(NSString *)string{ return @"ABC"; }
 @end
 
 @interface RSSwizzleTestClass_B : RSSwizzleTestClass_A @end
@@ -173,6 +174,28 @@ static void swizzleNumber(Class classToSwizzle, int(^transformationBlock)(int)){
     RSSwizzleTestClass_D *object = [RSSwizzleTestClass_D new];
     int res = [object calc:2];
     STAssertTrue(res == ((2 * (-1) * 3) + 17) * 5 * 11 - 20, @"%d",res);
+}
+
+#pragma mark - String Swizzling
+-(void)testStringSwizzling{
+    SEL selector = @selector(string);
+    RSSwizzleTestClass_A *a = [RSSwizzleTestClass_A new];
+    
+    [RSSwizzle
+     swizzleInstanceMethod:selector
+     inClass:[a class]
+     newImpFactory:^id(RSSwizzleInfo *swizzleInfo) {
+         return ^NSString *(__unsafe_unretained id self){
+             NSString *(*originalIMP)(__unsafe_unretained id, SEL);
+             originalIMP = (__typeof(originalIMP))[swizzleInfo getOriginalImplementation];
+             NSString *res = originalIMP(self,selector);
+
+             return [res stringByAppendingString:@"DEF"];
+         };
+     }
+     mode:RSSwizzleModeAlways
+     key:NULL];
+    STAssertTrue([[a string] isEqualToString:@"ABCDEF"], nil);
 }
 
 #pragma mark - Test Assertions
