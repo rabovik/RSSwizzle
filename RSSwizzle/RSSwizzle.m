@@ -184,9 +184,10 @@ static void swizzle(Class classToSwizzle,
     Method method = class_getInstanceMethod(classToSwizzle, selector);
     
     NSCAssert(NULL != method,
-             @"Selector %@ not found in instance methods of class %@.",
-             NSStringFromSelector(selector),
-             classToSwizzle);
+              @"Selector %@ not found in %@ methods of class %@.",
+              NSStringFromSelector(selector),
+              class_isMetaClass(classToSwizzle) ? @"class" : @"instance",
+              classToSwizzle);
     
     NSCAssert(blockIsAnImpFactoryBlock(factoryBlock),
              @"Wrong type of implementation factory block.");
