@@ -66,9 +66,31 @@ static const char *blockGetType(id block){
 }
 
 static BOOL blockIsCompatibleWithMethodType(id block, const char *methodType){
+    
     const char *blockType = blockGetType(block);
-    NSMethodSignature *blockSignature =
-        [NSMethodSignature signatureWithObjCTypes:blockType];
+    
+    NSMethodSignature *blockSignature;
+    
+    if (0 == strncmp(blockType, (const char *)"@\"", 2)) {
+        // Block return type includes class name for id types
+        // while methodType does not include.
+        // Stripping out return class name.
+        char *quotePtr = strchr(blockType+2, '"');
+        if (NULL != quotePtr) {
+            ++quotePtr;
+            char filteredType[strlen(quotePtr) + 2];
+            memset(filteredType, 0, sizeof(filteredType));
+            *filteredType = '@';
+            strncpy(filteredType + 1, quotePtr, sizeof(filteredType) - 2);
+            
+            blockSignature = [NSMethodSignature signatureWithObjCTypes:filteredType];
+        }else{
+            return NO;
+        }
+    }else{
+        blockSignature = [NSMethodSignature signatureWithObjCTypes:blockType];
+    }
+    
     NSMethodSignature *methodSignature =
         [NSMethodSignature signatureWithObjCTypes:methodType];
     
@@ -79,13 +101,8 @@ static BOOL blockIsCompatibleWithMethodType(id block, const char *methodType){
     if (blockSignature.numberOfArguments != methodSignature.numberOfArguments){
         return NO;
     }
-    const char *blockReturnType = blockSignature.methodReturnType;
     
-    if (strncmp(blockReturnType, "@", 1) == 0) {
-        blockReturnType = "@";
-    }
-    
-    if (strcmp(blockReturnType, methodSignature.methodReturnType) != 0) {
+    if (strcmp(blockSignature.methodReturnType, methodSignature.methodReturnType) != 0) {
         return NO;
     }
     
