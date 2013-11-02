@@ -44,9 +44,30 @@ SEL selector = @selector(calculate:);
  key:NULL];
 ```
 
+#### Class Method Swizzling
+Class method swizzling is done with a similar API.
+
+Example for swizzling `+(int)calculate:(int)number;` method:
+
+```objective-c
+SEL selector = @selector(calculate:);
+[RSSwizzle
+ swizzleClassMethod:selector
+ inClass:classToSwizzle
+ newImpFactory:^id(RSSWizzleInfo *swizzleInfo) {
+     return ^int(__unsafe_unretained id self, int num){
+         int (*originalIMP)(__unsafe_unretained id, SEL, int);
+         originalIMP = (__typeof(originalIMP))[swizzleInfo getOriginalImplementation];
+         int res = originalIMP(self,selector,num);
+         return res + 1;
+     };
+ }];
+```
+
+
 #### Modes
 
-Most of the time swizzling goes along with checking whether this particular class (or one of its superclasses) has been already swizzled. Here the `mode` and `key` parameters can help.
+Swizzling frequently goes along with checking whether this particular class (or one of its superclasses) has been already swizzled. Here the `mode` and `key` parameters can help.
 Possible mode values:
 
 * `RSSwizzleModeAlways` **RSSwizzle** always does swizzling regardless of the given `key`.
