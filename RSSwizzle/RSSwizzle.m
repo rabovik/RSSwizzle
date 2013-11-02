@@ -148,9 +148,9 @@ typedef IMP (^RSSWizzleImpProvider)(void);
 @implementation RSSwizzleInfo
 
 -(RSSwizzleOriginalIMP)getOriginalImplementation{
-    NSAssert(self.impProviderBlock,nil);
+    NSAssert(_impProviderBlock,nil);
     // Casting IMP to RSSwizzleOriginalIMP to force user casting.
-    return (RSSwizzleOriginalIMP)self.impProviderBlock();
+    return (RSSwizzleOriginalIMP)_impProviderBlock();
 }
 
 @end
