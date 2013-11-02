@@ -1,6 +1,6 @@
 Pod::Spec.new do |s|
   s.name         = "RSSwizzle"
-  s.version      = "0.0.1"
+  s.version      = "0.1.0"
   s.summary      = "Safe method swizzling done right."
   s.homepage     = "https://github.com/rabovik/RSSwizzle"
   s.license      = 'MIT'
