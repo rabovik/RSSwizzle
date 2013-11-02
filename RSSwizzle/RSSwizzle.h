@@ -101,7 +101,7 @@
         int res = RSSWCallOriginal(number);
         // Returning modified return value.
         return res + 1;
-    }), 0, NULL);
+    }));
  
  @endcode
 
