@@ -29,6 +29,9 @@ typedef void (*RSSwizzleOriginalIMP)(void /* id, SEL, ... */ );
  */
 -(RSSwizzleOriginalIMP)getOriginalImplementation;
 
+/// The selector of the swizzled method.
+@property (nonatomic, readonly) SEL selector;
+
 @end
 
 /**

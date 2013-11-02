@@ -143,6 +143,7 @@ typedef IMP (^RSSWizzleImpProvider)(void);
 
 @interface RSSwizzleInfo()
 @property (nonatomic,copy) RSSWizzleImpProvider impProviderBlock;
+@property (nonatomic, readwrite) SEL selector;
 @end
 
 @implementation RSSwizzleInfo
@@ -197,6 +198,7 @@ static void swizzle(Class classToSwizzle,
     };
     
     RSSwizzleInfo *swizzleInfo = [RSSwizzleInfo new];
+    swizzleInfo.selector = selector;
     swizzleInfo.impProviderBlock = originalImpProvider;
     
     // We ask the client for the new implementation block.
