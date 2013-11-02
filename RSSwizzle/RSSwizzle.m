@@ -283,4 +283,16 @@ static NSMutableSet *swizzledClassesForKey(const void *key){
     return YES;
 }
 
++(void)swizzleClassMethod:(SEL)selector
+                  inClass:(Class)classToSwizzle
+            newImpFactory:(RSSwizzleImpFactoryBlock)factoryBlock
+{
+    [self swizzleInstanceMethod:selector
+                        inClass:object_getClass(classToSwizzle)
+                  newImpFactory:factoryBlock
+                           mode:RSSwizzleModeAlways
+                            key:NULL];
+}
+
+
 @end

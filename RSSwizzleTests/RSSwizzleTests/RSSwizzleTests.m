@@ -22,6 +22,9 @@
 -(void)methodForSwizzlingOncePerClass{};
 -(void)methodForSwizzlingOncePerClassOrSuperClasses{};
 -(NSString *)string{ return @"ABC"; }
++(NSNumber *)sumFloat:(float)floatSummand withDouble:(double)doubleSummand{
+    return @(floatSummand + doubleSummand);
+}
 @end
 
 @interface RSSwizzleTestClass_B : RSSwizzleTestClass_A @end
@@ -196,6 +199,30 @@ static void swizzleNumber(Class classToSwizzle, int(^transformationBlock)(int)){
      mode:RSSwizzleModeAlways
      key:NULL];
     STAssertTrue([[a string] isEqualToString:@"ABCDEF"], nil);
+}
+
+#pragma mark - Class Swizzling
+-(void)testClassSwizzling{
+    [RSSwizzle
+     swizzleClassMethod:@selector(sumFloat:withDouble:)
+     inClass:[RSSwizzleTestClass_B class]
+     newImpFactory:^id(RSSwizzleInfo *swizzleInfo) {
+         return ^NSNumber *(__unsafe_unretained id self,
+                            float floatSummand,
+                            double doubleSummand)
+         {
+             NSNumber *(* originalIMP)(__unsafe_unretained id self,SEL,float,double);
+             originalIMP = (__typeof(originalIMP))[swizzleInfo getOriginalImplementation];
+             NSNumber *result = originalIMP(self,
+                                            @selector(sumFloat:withDouble:),
+                                            floatSummand,
+                                            doubleSummand);
+             return @([result doubleValue]* 2.);
+         };
+     }];
+    STAssertEqualObjects(@(2.), [RSSwizzleTestClass_A sumFloat:0.5 withDouble:1.5 ], nil);
+    STAssertEqualObjects(@(4.), [RSSwizzleTestClass_B sumFloat:0.5 withDouble:1.5 ], nil);
+    STAssertEqualObjects(@(4.), [RSSwizzleTestClass_C sumFloat:0.5 withDouble:1.5 ], nil);
 }
 
 #pragma mark - Test Assertions

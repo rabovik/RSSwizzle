@@ -58,7 +58,7 @@ typedef NS_ENUM(NSUInteger, RSSwizzleMode) {
 
 
 /**
- Swizzles the method of the class with the new implementation.
+ Swizzles the instance method of the class with the new implementation.
 
  Original implementation must always be called from the new implementation. And because of the the fact that for safe and robust swizzling original implementation must be dynamically fetched at the time of calling and not at the time of swizzling, swizzling API is a little bit complicated.
 
@@ -89,7 +89,7 @@ typedef NS_ENUM(NSUInteger, RSSwizzleMode) {
  
  @endcode
 
- Most of the time swizzling goes along with checking whether this particular class (or one of its superclasses) has been already swizzled. Here the `mode` and `key` parameters can help.
+ Swizzling frequently goes along with checking whether this particular class (or one of its superclasses) has been already swizzled. Here the `mode` and `key` parameters can help.
 
  Here is an example of swizzling `-(void)dealloc;` only in case when neither class and no one of its superclasses has been already swizzled with our key. However "Deallocating ..." message still may be logged multiple times per method call if swizzling was called primarily for an inherited class and later for one of its superclasses.
  
@@ -133,5 +133,47 @@ typedef NS_ENUM(NSUInteger, RSSwizzleMode) {
                newImpFactory:(RSSwizzleImpFactoryBlock)factoryBlock
                         mode:(RSSwizzleMode)mode
                          key:(const void *)key;
+
+/**
+ Swizzles the class method of the class with the new implementation.
+
+ Original implementation must always be called from the new implementation. And because of the the fact that for safe and robust swizzling original implementation must be dynamically fetched at the time of calling and not at the time of swizzling, swizzling API is a little bit complicated.
+
+ You should pass a factory block that returns the block for the new implementation of the swizzled method. And use swizzleInfo argument to retrieve and call original implementation.
+
+ Example for swizzling `+(int)calculate:(int)number;` method:
+ 
+ @code
+
+    SEL selector = @selector(calculate:);
+    [RSSwizzle
+     swizzleClassMethod:selector
+     inClass:classToSwizzle
+     newImpFactory:^id(RSSWizzleInfo *swizzleInfo) {
+         // This block will be used as the new implementation.
+         return ^int(__unsafe_unretained id self, int num){
+             // You MUST always cast implementation to the correct function pointer.
+             int (*originalIMP)(__unsafe_unretained id, SEL, int);
+             originalIMP = (__typeof(originalIMP))[swizzleInfo getOriginalImplementation];
+             // Calling original implementation.
+             int res = originalIMP(self,selector,num);
+             // Returning modified return value.
+             return res + 1;
+         };
+     }];
+ 
+ @endcode
+
+ Swizzling is fully thread-safe.
+ 
+ @param selector Selector of the method that should be swizzled.
+
+ @param classToSwizzle The class with the method that should be swizzled.
+ 
+ @param factoryBlock The factory block returning the block for the new implementation of the swizzled method.
+ */
++(void)swizzleClassMethod:(SEL)selector
+                  inClass:(Class)classToSwizzle
+            newImpFactory:(RSSwizzleImpFactoryBlock)factoryBlock;
 
 @end
