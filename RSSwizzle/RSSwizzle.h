@@ -23,6 +23,50 @@
 /// May be used only in RSSwizzleInstanceMethod or RSSwizzleClassMethod macros.
 #define RSSWCallOriginal(arguments...) _RSSWCallOriginal(arguments)
 
+#pragma mark └ Swizzle Instance Method
+
+/**
+ Swizzles the instance method of the class with the new implementation.
+
+ Example for swizzling `-(int)calculate:(int)number;` method:
+
+ @code
+
+    RSSwizzleInstanceMethod(classToSwizzle,
+                            @selector(calculate:),
+                            RSSWReturnType(int),
+                            RSSWArguments(int number),
+                            RSSWReplacement(
+    {
+        // Calling original implementation.
+        int res = RSSWCallOriginal(number);
+        // Returning modified return value.
+        return res + 1;
+    }), 0, NULL);
+ 
+ @endcode
+ 
+ Swizzling frequently goes along with checking whether this particular class (or one of its superclasses) has been already swizzled. Here the `RSSwizzleMode` and `key` parameters can help. See +[RSSwizzle swizzleInstanceMethod:inClass:newImpFactory:mode:key:] for details.
+
+ Swizzling is fully thread-safe.
+
+ @param classToSwizzle The class with the method that should be swizzled.
+
+ @param selector Selector of the method that should be swizzled.
+ 
+ @param RSSWReturnType The return type of the swizzled method wrapped in the RSSWReturnType macro.
+ 
+ @param RSSWArguments The arguments of the swizzled method wrapped in the RSSWArguments macro.
+ 
+ @param RSSWReplacement The code of the new implementation of the swizzled method wrapped in the RSSWReplacement macro.
+ 
+ @param RSSwizzleMode The mode is used in combination with the key to indicate whether the swizzling should be done for the given class. You can pass 0 for RSSwizzleModeAlways.
+ 
+ @param key The key is used in combination with the mode to indicate whether the swizzling should be done for the given class. May be NULL if the mode is RSSwizzleModeAlways.
+
+ @return YES if successfully swizzled and NO if swizzling has been already done for given key and class (or one of superclasses, depends on the mode).
+
+ */
 #define RSSwizzleInstanceMethod(classToSwizzle, \
                                 selector, \
                                 RSSWReturnType, \
@@ -38,6 +82,42 @@
                              RSSwizzleMode, \
                              key)
 
+#pragma mark └ Swizzle Class Method
+
+/**
+ Swizzles the class method of the class with the new implementation.
+
+ Example for swizzling `+(int)calculate:(int)number;` method:
+
+ @code
+
+    RSSwizzleClassMethod(classToSwizzle,
+                         @selector(calculate:),
+                         RSSWReturnType(int),
+                         RSSWArguments(int number),
+                         RSSWReplacement(
+    {
+        // Calling original implementation.
+        int res = RSSWCallOriginal(number);
+        // Returning modified return value.
+        return res + 1;
+    }), 0, NULL);
+ 
+ @endcode
+
+ Swizzling is fully thread-safe.
+
+ @param classToSwizzle The class with the method that should be swizzled.
+
+ @param selector Selector of the method that should be swizzled.
+ 
+ @param RSSWReturnType The return type of the swizzled method wrapped in the RSSWReturnType macro.
+ 
+ @param RSSWArguments The arguments of the swizzled method wrapped in the RSSWArguments macro.
+ 
+ @param RSSWReplacement The code of the new implementation of the swizzled method wrapped in the RSSWReplacement macro.
+ 
+ */
 #define RSSwizzleClassMethod(classToSwizzle, \
                              selector, \
                              RSSWReturnType, \
@@ -102,6 +182,7 @@ typedef NS_ENUM(NSUInteger, RSSwizzleMode) {
 
 @interface RSSwizzle : NSObject
 
+#pragma mark └ Swizzle Instance Method
 
 /**
  Swizzles the instance method of the class with the new implementation.
@@ -179,6 +260,8 @@ typedef NS_ENUM(NSUInteger, RSSwizzleMode) {
                newImpFactory:(RSSwizzleImpFactoryBlock)factoryBlock
                         mode:(RSSwizzleMode)mode
                          key:(const void *)key;
+
+#pragma mark └ Swizzle Class method
 
 /**
  Swizzles the class method of the class with the new implementation.
