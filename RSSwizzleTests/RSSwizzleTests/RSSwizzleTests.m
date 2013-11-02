@@ -50,20 +50,15 @@ static void swizzleVoidMethod(Class classToSwizzle,
                               RSSwizzleMode mode,
                               const void *key)
 {
-    [RSSwizzle
-     swizzleInstanceMethod:selector
-     inClass:classToSwizzle
-     newImpFactory:^id(RSSwizzleInfo *swizzleInfo) {
-         return ^void(__unsafe_unretained id self){
-             blockBefore();
-             
-             void (*originalIMP)(__unsafe_unretained id, SEL);
-             originalIMP = (__typeof(originalIMP))[swizzleInfo getOriginalImplementation];
-             originalIMP(self,selector);
-         };
-     }
-     mode:mode
-     key:key];
+    RSSwizzleInstanceMethod(classToSwizzle,
+                            selector,
+                            RSSWReturnType(void),
+                            RSSWArguments(),
+                            RSSWReplacement(
+    {
+        blockBefore();
+        RSSWCallOriginal();
+    }), mode, key);
 }
 
 static void swizzleDealloc(Class classToSwizzle, dispatch_block_t blockBefore){
@@ -72,21 +67,15 @@ static void swizzleDealloc(Class classToSwizzle, dispatch_block_t blockBefore){
 }
 
 static void swizzleNumber(Class classToSwizzle, int(^transformationBlock)(int)){
-    SEL selector = NSSelectorFromString(@"calc:");
-    [RSSwizzle
-     swizzleInstanceMethod:selector
-     inClass:classToSwizzle
-     newImpFactory:^id(RSSwizzleInfo *swizzleInfo) {
-         return ^int(__unsafe_unretained id self, int num){
-             int (*originalIMP)(__unsafe_unretained id, SEL, int);
-             originalIMP = (__typeof(originalIMP))[swizzleInfo getOriginalImplementation];
-             int res = originalIMP(self,selector,num);
-             
-             return transformationBlock(res);
-         };
-     }
-     mode:RSSwizzleModeAlways
-     key:NULL];
+    RSSwizzleInstanceMethod(classToSwizzle,
+                            @selector(calc:),
+                            RSSWReturnType(int),
+                            RSSWArguments(int num),
+                            RSSWReplacement(
+    {
+        int res = RSSWCallOriginal(num);
+        return transformationBlock(res);
+    }), RSSwizzleModeAlways, NULL);
 }
 
 #pragma mark - TESTS -
@@ -184,42 +173,31 @@ static void swizzleNumber(Class classToSwizzle, int(^transformationBlock)(int)){
     SEL selector = @selector(string);
     RSSwizzleTestClass_A *a = [RSSwizzleTestClass_A new];
     
-    [RSSwizzle
-     swizzleInstanceMethod:selector
-     inClass:[a class]
-     newImpFactory:^id(RSSwizzleInfo *swizzleInfo) {
-         return ^NSString *(__unsafe_unretained id self){
-             NSString *(*originalIMP)(__unsafe_unretained id, SEL);
-             originalIMP = (__typeof(originalIMP))[swizzleInfo getOriginalImplementation];
-             NSString *res = originalIMP(self,selector);
-
-             return [res stringByAppendingString:@"DEF"];
-         };
-     }
-     mode:RSSwizzleModeAlways
-     key:NULL];
+    RSSwizzleInstanceMethod([a class],
+                            selector,
+                            RSSWReturnType(NSString *),
+                            RSSWArguments(),
+                            RSSWReplacement(
+    {
+        NSString *res = RSSWCallOriginal();
+        return [res stringByAppendingString:@"DEF"];
+    }), RSSwizzleModeAlways, NULL);
+    
     STAssertTrue([[a string] isEqualToString:@"ABCDEF"], nil);
 }
 
 #pragma mark - Class Swizzling
 -(void)testClassSwizzling{
-    [RSSwizzle
-     swizzleClassMethod:@selector(sumFloat:withDouble:)
-     inClass:[RSSwizzleTestClass_B class]
-     newImpFactory:^id(RSSwizzleInfo *swizzleInfo) {
-         return ^NSNumber *(__unsafe_unretained id self,
-                            float floatSummand,
-                            double doubleSummand)
-         {
-             NSNumber *(* originalIMP)(__unsafe_unretained id self,SEL,float,double);
-             originalIMP = (__typeof(originalIMP))[swizzleInfo getOriginalImplementation];
-             NSNumber *result = originalIMP(self,
-                                            @selector(sumFloat:withDouble:),
-                                            floatSummand,
-                                            doubleSummand);
-             return @([result doubleValue]* 2.);
-         };
-     }];
+    RSSwizzleClassMethod([RSSwizzleTestClass_B class],
+                         @selector(sumFloat:withDouble:),
+                         RSSWReturnType(NSNumber *),
+                         RSSWArguments(float floatSummand, double doubleSummand),
+                         RSSWReplacement(
+    {
+        NSNumber *result = RSSWCallOriginal(floatSummand, doubleSummand);
+        return @([result doubleValue]* 2.);
+    }));
+    
     STAssertEqualObjects(@(2.), [RSSwizzleTestClass_A sumFloat:0.5 withDouble:1.5 ], nil);
     STAssertEqualObjects(@(4.), [RSSwizzleTestClass_B sumFloat:0.5 withDouble:1.5 ], nil);
     STAssertEqualObjects(@(4.), [RSSwizzleTestClass_C sumFloat:0.5 withDouble:1.5 ], nil);

@@ -8,6 +8,49 @@
 
 #import <Foundation/Foundation.h>
 
+#pragma mark - Macros Based API
+
+/// A macro for wrapping the return type of the swizzled method.
+#define RSSWReturnType(type) type
+
+/// A macro for wrapping arguments of the swizzled method.
+#define RSSWArguments(arguments...) _RSSWArguments(arguments)
+
+/// A macro for wrapping the replacement code for the swizzled method.
+#define RSSWReplacement(code...) code
+
+/// A macro for casting and calling original implementation.
+/// May be used only in RSSwizzleInstanceMethod or RSSwizzleClassMethod macros.
+#define RSSWCallOriginal(arguments...) _RSSWCallOriginal(arguments)
+
+#define RSSwizzleInstanceMethod(classToSwizzle, \
+                                selector, \
+                                RSSWReturnType, \
+                                RSSWArguments, \
+                                RSSWReplacement, \
+                                RSSwizzleMode, \
+                                key) \
+    _RSSwizzleInstanceMethod(classToSwizzle, \
+                             selector, \
+                             RSSWReturnType, \
+                             _RSSWWrapArg(RSSWArguments), \
+                             _RSSWWrapArg(RSSWReplacement), \
+                             RSSwizzleMode, \
+                             key)
+
+#define RSSwizzleClassMethod(classToSwizzle, \
+                             selector, \
+                             RSSWReturnType, \
+                             RSSWArguments, \
+                             RSSWReplacement) \
+    _RSSwizzleClassMethod(classToSwizzle, \
+                          selector, \
+                          RSSWReturnType, \
+                          _RSSWWrapArg(RSSWArguments), \
+                          _RSSWWrapArg(RSSWReplacement))
+
+#pragma mark - Main API
+
 /**
  A function pointer to the original implementation of the swizzled method.
  */
@@ -180,3 +223,66 @@ typedef NS_ENUM(NSUInteger, RSSwizzleMode) {
             newImpFactory:(RSSwizzleImpFactoryBlock)factoryBlock;
 
 @end
+
+#pragma mark - Implementation details
+// Do not write code that depends on anything below this line.
+
+// Wrapping arguments to pass them as a single argument to another macro.
+#define _RSSWWrapArg(args...) args
+
+#define _RSSWDel2Arg(a1, a2, args...) a1, ##args
+#define _RSSWDel3Arg(a1, a2, a3, args...) a1, a2, ##args
+
+// To prevent comma issues if there are no arguments we add one dummy argument
+// and remove it later.
+#define _RSSWArguments(arguments...) DEL, ##arguments
+
+#define _RSSwizzleInstanceMethod(classToSwizzle, \
+                                 selector, \
+                                 RSSWReturnType, \
+                                 RSSWArguments, \
+                                 RSSWReplacement, \
+                                 RSSwizzleMode, \
+                                 KEY) \
+    [RSSwizzle \
+     swizzleInstanceMethod:selector \
+     inClass:[classToSwizzle class] \
+     newImpFactory:^id(RSSwizzleInfo *swizzleInfo) { \
+        RSSWReturnType (*originalImplementation_)(_RSSWDel3Arg(__unsafe_unretained id, \
+                                                               SEL, \
+                                                               RSSWArguments)); \
+        SEL selector_ = selector; \
+        return ^RSSWReturnType (_RSSWDel2Arg(__unsafe_unretained id self, \
+                                             RSSWArguments)) \
+        { \
+            RSSWReplacement \
+        }; \
+     } \
+     mode:RSSwizzleMode \
+     key:KEY];
+
+#define _RSSwizzleClassMethod(classToSwizzle, \
+                              selector, \
+                              RSSWReturnType, \
+                              RSSWArguments, \
+                              RSSWReplacement) \
+    [RSSwizzle \
+     swizzleClassMethod:selector \
+     inClass:[classToSwizzle class] \
+     newImpFactory:^id(RSSwizzleInfo *swizzleInfo) { \
+        RSSWReturnType (*originalImplementation_)(_RSSWDel3Arg(__unsafe_unretained id, \
+                                                               SEL, \
+                                                               RSSWArguments)); \
+        SEL selector_ = selector; \
+        return ^RSSWReturnType (_RSSWDel2Arg(__unsafe_unretained id self, \
+                                             RSSWArguments)) \
+        { \
+            RSSWReplacement \
+        }; \
+     }];
+
+#define _RSSWCallOriginal(arguments...) \
+    ((__typeof(originalImplementation_))[swizzleInfo \
+                                         getOriginalImplementation])(self, \
+                                                                     selector_, \
+                                                                     ##arguments)
