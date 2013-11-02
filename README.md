@@ -17,7 +17,29 @@ For more details see discussions in: [1][774], [2][775], [3][SO], [4][TH], [5][c
 
 ## Usage
 
-Original implementation must always be called from the new implementation. And because of the the fact that for safe and robust swizzling original implementation must be dynamically fetched at the time of calling and not at the time of swizzling <sup>([1][774],[2][775])</sup>, swizzling API is a little bit complicated.
+Original implementation must always be called from the new implementation. And because of the the fact that for safe and robust swizzling original implementation must be dynamically fetched at the time of calling and not at the time of swizzling <sup>([1][774],[2][775])</sup>, swizzling API is slightly unusual.
+
+Example for swizzling `-(int)calculate:(int)number;` method:
+
+```objective-c
+RSSwizzleInstanceMethod(classToSwizzle,
+                        @selector(calculate:),
+                        RSSWReturnType(int),
+                        RSSWArguments(int number),
+                        RSSWReplacement(
+{
+    // This following code will be used as the new implementation.
+
+    // Calling original implementation.
+    int res = RSSWCallOriginal(number);
+    // Returning modified return value.
+    return res + 1;
+}), 0, NULL);
+```
+
+#### Alternative API
+
+Alternatively you may use an API without macros, though it is a little bit complicated.
 
 You should pass a factory block that returns the block for the new implementation of the swizzled method. And use `swizzleInfo` argument to retrieve and call original implementation.
 
@@ -50,18 +72,17 @@ Class method swizzling is done with a similar API.
 Example for swizzling `+(int)calculate:(int)number;` method:
 
 ```objective-c
-SEL selector = @selector(calculate:);
-[RSSwizzle
- swizzleClassMethod:selector
- inClass:classToSwizzle
- newImpFactory:^id(RSSWizzleInfo *swizzleInfo) {
-     return ^int(__unsafe_unretained id self, int num){
-         int (*originalIMP)(__unsafe_unretained id, SEL, int);
-         originalIMP = (__typeof(originalIMP))[swizzleInfo getOriginalImplementation];
-         int res = originalIMP(self,selector,num);
-         return res + 1;
-     };
- }];
+RSSwizzleClassMethod(classToSwizzle,
+                     @selector(calculate:),
+                     RSSWReturnType(int),
+                     RSSWArguments(int number),
+                     RSSWReplacement(
+{
+    // Calling original implementation.
+    int res = RSSWCallOriginal(number);
+    // Returning modified return value.
+    return res + 1;
+}));
 ```
 
 
@@ -79,20 +100,15 @@ Here is an example of swizzling `-(void)dealloc;` only in case when neither clas
 ```objective-c
 static const void *key = &key;
 SEL selector = NSSelectorFromString(@"dealloc");
-[RSSwizzle
- swizzleInstanceMethod:selector
- inClass:classToSwizzle
- newImpFactory:^id(RSSWizzleInfo *swizzleInfo) {
-     return ^void(__unsafe_unretained id self){
-         NSLog(@"Deallocating %@.",self);
-         
-         void (*originalIMP)(__unsafe_unretained id, SEL);
-         originalIMP = (__typeof(originalIMP))[swizzleInfo getOriginalImplementation];
-         originalIMP(self,selector);
-     };
- }
- mode:RSSwizzleModeOncePerClassAndSuperclasses
- key:key];
+RSSwizzleInstanceMethod(classToSwizzle,
+                        selector,
+                        RSSWReturnType(void),
+                        RSSWArguments(),
+                        RSSWReplacement(
+{
+    NSLog(@"Deallocating %@.",self);
+    RSSWCallOriginal();
+}), RSSwizzleModeOncePerClassAndSuperclasses, key);
 ```
 
 > **Note:** `RSSwizzleModeOncePerClassAndSuperclasses ` mode does not guarantees that your implementation will be called only once per method call. If the order of swizzling is: first inherited class, second superclass; then both swizzlings will be done and the new implementation will be called twice.
