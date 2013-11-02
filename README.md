@@ -28,7 +28,7 @@ RSSwizzleInstanceMethod(classToSwizzle,
                         RSSWArguments(int number),
                         RSSWReplacement(
 {
-    // This following code will be used as the new implementation.
+    // The following code will be used as the new implementation.
 
     // Calling original implementation.
     int res = RSSWCallOriginal(number);
