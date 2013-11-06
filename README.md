@@ -50,7 +50,7 @@ SEL selector = @selector(calculate:);
 [RSSwizzle
  swizzleInstanceMethod:selector
  inClass:classToSwizzle
- newImpFactory:^id(RSSWizzleInfo *swizzleInfo) {
+ newImpFactory:^id(RSSwizzleInfo *swizzleInfo) {
      // This block will be used as the new implementation.
      return ^int(__unsafe_unretained id self, int num){
          // You MUST always cast implementation to the correct function pointer.
