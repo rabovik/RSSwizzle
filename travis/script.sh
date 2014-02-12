@@ -5,3 +5,4 @@ xcodebuild -project RSSwizzleTests/RSSwizzleTests.xcodeproj -scheme RSSwizzleTes
 xcodebuild -project RSSwizzleTests/RSSwizzleTests.xcodeproj -scheme RSSwizzleTests-iOS -sdk iphonesimulator -destination OS=6.0,name=iPhone -configuration Release test
 xcodebuild -project RSSwizzleTests/RSSwizzleTests.xcodeproj -scheme RSSwizzleTests-iOS -sdk iphonesimulator -configuration Release test
 
+xcodebuild -project RSSwizzleTests/RSSwizzleTests.xcodeproj -scheme RSSwizzleTests-OSX -configuration Release test

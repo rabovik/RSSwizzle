@@ -303,4 +303,13 @@ static void swizzleNumber(Class classToSwizzle, int(^transformationBlock)(int)){
     ASSERT_LOG_IS(@"A");
 }
 
+#if TARGET_OS_IPHONE
+-(void)testFailOnIOS6{
+    NSLog(@"iOS %d",[[UIDevice currentDevice].systemVersion integerValue]);
+    if ([[UIDevice currentDevice].systemVersion integerValue] == 6) {
+        STFail(@"Fail on iOS 6.");
+    }
+}
+#endif
+
 @end
