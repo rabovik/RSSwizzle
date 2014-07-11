@@ -233,7 +233,7 @@ static void swizzle(Class classToSwizzle,
     
     // Atomically replace the original method with our new implementation.
     // This will ensure that if someone else's code on another thread is messing
-    // with the class' method list too, we always have a valid -dealloc at all times.
+    // with the class' method list too, we always have a valid method at all times.
     //
     // If the class does not implement the method itself then
     // class_replaceMethod returns NULL and superclasses's implementation will be used.
