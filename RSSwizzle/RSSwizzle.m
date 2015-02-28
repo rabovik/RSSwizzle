@@ -126,7 +126,11 @@ static BOOL blockIsCompatibleWithMethodType(id block, const char *methodType){
         }else {
             const char *blockSignatureArg = [blockSignature getArgumentTypeAtIndex:i];
             
-            if (strncmp(blockSignatureArg, "@", 1) == 0) {
+            if (strncmp(blockSignatureArg, "@?", 2) == 0) {
+                // Handle function pointer / block arguments
+                blockSignatureArg = "@?";
+            }
+            else if (strncmp(blockSignatureArg, "@", 1) == 0) {
                 blockSignatureArg = "@";
             }
             
