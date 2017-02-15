@@ -8,7 +8,7 @@
 
 #import "RSSwizzle.h"
 #import <objc/runtime.h>
-#import <libkern/OSAtomic.h>
+#import <os/lock.h>
 
 #if !__has_feature(objc_arc)
 #error This code needs ARC. Use compiler option -fobjc-arc
@@ -196,7 +196,7 @@ static void swizzle(Class classToSwizzle,
     NSCAssert(blockIsAnImpFactoryBlock(factoryBlock),
              @"Wrong type of implementation factory block.");
     
-    __block OSSpinLock lock = OS_SPINLOCK_INIT;
+    __block os_unfair_lock lock = OS_UNFAIR_LOCK_INIT;
     // To keep things thread-safe, we fill in the originalIMP later,
     // with the result of the class_replaceMethod call below.
     __block IMP originalIMP = NULL;
@@ -206,9 +206,9 @@ static void swizzle(Class classToSwizzle,
         // It's possible that another thread can call the method between the call to
         // class_replaceMethod and its return value being set.
         // So to be sure originalIMP has the right value, we need a lock.
-        OSSpinLockLock(&lock);
+        os_unfair_lock_lock(&lock);
         IMP imp = originalIMP;
-        OSSpinLockUnlock(&lock);
+        os_unfair_lock_unlock(&lock);
         
         if (NULL == imp){
             // If the class does not implement the method
@@ -244,9 +244,9 @@ static void swizzle(Class classToSwizzle,
     //
     // We need a lock to be sure that originalIMP has the right value in the
     // originalImpProvider block above.
-    OSSpinLockLock(&lock);
+    os_unfair_lock_lock(&lock);
     originalIMP = class_replaceMethod(classToSwizzle, selector, newIMP, methodType);
-    OSSpinLockUnlock(&lock);
+    os_unfair_lock_unlock(&lock);
 }
 
 static NSMutableDictionary *swizzledClassesDictionary(){
