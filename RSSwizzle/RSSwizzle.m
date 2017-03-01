@@ -18,7 +18,7 @@
 #else
 //use this struct to inialize an unfair_lock
 typedef struct _os_unfair_lock_s {
-uint32_t _os_unfair_lock_opaque;
+    uint32_t _os_unfair_lock_opaque;
 } os_unfair_lock, *os_unfair_lock_t;
 #endif
 
@@ -31,7 +31,7 @@ uint32_t _os_unfair_lock_opaque;
 #pragma mark Locking
 
 // This function will lock a lock using os_unfair_lock_lock (on ios10/macos10.12) or OSSpinLockLock (9 and lower).
-void chooseLock(void *lock)
+static void chooseLock(void *lock)
 {
 #if TARGET_SDK_GE_10
     // iOS 10+, os_unfair_lock_lock is available
@@ -56,7 +56,7 @@ void chooseLock(void *lock)
 }
 
 // This function will unlock a lock using os_unfair_lock_unlock (on ios10/macos10.12) or OSSpinLockUnlock (9 and lower).
-void chooseUnlock(void *lock)
+static void chooseUnlock(void *lock)
 {
 #if TARGET_SDK_GE_10
     // iOS 10+, os_unfair_lock_unlock is available
@@ -268,7 +268,7 @@ static void swizzle(Class classToSwizzle,
     // Below iOS 10, OS_UNFAIR_LOCK_INIT will not exist. Note that this type works with OSSpinLock
     __block os_unfair_lock lock = ((os_unfair_lock){0});
 #endif
-
+    
     // To keep things thread-safe, we fill in the originalIMP later,
     // with the result of the class_replaceMethod call below.
     __block IMP originalIMP = NULL;
@@ -279,7 +279,7 @@ static void swizzle(Class classToSwizzle,
         // class_replaceMethod and its return value being set.
         // So to be sure originalIMP has the right value, we need a lock.
         
-
+        
         chooseLock(&lock);
         
         IMP imp = originalIMP;
