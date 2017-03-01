@@ -10,30 +10,34 @@
 #import <objc/runtime.h>
 #include <dlfcn.h>
 
-// Use os_unfair_lock over OSSpinLock when building with ios sdk 10 or macos sdk 10.12
-#define TARGET_SDK_GE_10 ((TARGET_OS_IOS && __IPHONE_OS_VERSION_MIN_REQUIRED >= 100000) || (!TARGET_OS_IPHONE && __MAC_OS_X_VERSION_MAX_ALLOWED >= 101200))
-
-#if TARGET_SDK_GE_10
-#import <os/lock.h>
-#else
-//use this struct to inialize an unfair_lock
-typedef struct _os_unfair_lock_s {
-    uint32_t _os_unfair_lock_opaque;
-} os_unfair_lock, *os_unfair_lock_t;
-#endif
-
-#import <libkern/OSAtomic.h>
 
 #if !__has_feature(objc_arc)
 #error This code needs ARC. Use compiler option -fobjc-arc
 #endif
+
+
+// Use os_unfair_lock over OSSpinLock when building with the following SDKs: iOS 10, macOS 10.12 and any tvOS and watchOS
+#define DEPLOYMENT_TARGET_HIGHER_THAN_10 TARGET_OS_WATCH || TARGET_OS_TV || (TARGET_OS_IOS &&__IPHONE_OS_VERSION_MIN_REQUIRED >= 100000) || (!TARGET_OS_IPHONE && __MAC_OS_X_VERSION_MIN_ALLOWED >= 101200)
+
+#define BASE_SDK_HIGHER_THAN_10 (TARGET_OS_WATCH || TARGET_OS_TV || (TARGET_OS_IOS &&__IPHONE_OS_VERSION_MAX_ALLOWED >= 100000) || (!TARGET_OS_IPHONE && __MAC_OS_X_VERSION_MAX_ALLOWED >= 101200))
+
+
+#if BASE_SDK_HIGHER_THAN_10
+#import <os/lock.h>
+#endif
+
+
+#if !DEPLOYMENT_TARGET_HIGHER_THAN_10
+#import <libkern/OSAtomic.h>
+#endif
+
 
 #pragma mark Locking
 
 // This function will lock a lock using os_unfair_lock_lock (on ios10/macos10.12) or OSSpinLockLock (9 and lower).
 static void chooseLock(void *lock)
 {
-#if TARGET_SDK_GE_10
+#if DEPLOYMENT_TARGET_HIGHER_THAN_10
     // iOS 10+, os_unfair_lock_lock is available
     os_unfair_lock_lock(lock);
 #else
@@ -58,7 +62,7 @@ static void chooseLock(void *lock)
 // This function will unlock a lock using os_unfair_lock_unlock (on ios10/macos10.12) or OSSpinLockUnlock (9 and lower).
 static void chooseUnlock(void *lock)
 {
-#if TARGET_SDK_GE_10
+#if DEPLOYMENT_TARGET_HIGHER_THAN_10
     // iOS 10+, os_unfair_lock_unlock is available
     os_unfair_lock_unlock(lock);
 #else
