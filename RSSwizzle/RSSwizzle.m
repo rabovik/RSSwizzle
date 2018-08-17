@@ -130,8 +130,8 @@ static BOOL blockIsCompatibleWithMethodType(id block, const char *methodType){
                 blockSignatureArg = "@";
             }
             
-            if (strcmp(blockSignatureArg,
-                       [methodSignature getArgumentTypeAtIndex:i]) != 0)
+            if (strncmp(blockSignatureArg,
+                       [methodSignature getArgumentTypeAtIndex:i], 1) != 0)
             {
                 return NO;
             }
