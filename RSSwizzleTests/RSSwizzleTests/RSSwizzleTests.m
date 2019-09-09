@@ -6,7 +6,7 @@
 //
 //
 
-#import <SenTestingKit/SenTestingKit.h>
+#import <XCTest/XCTest.h>
 #import "RSTestsLog.h"
 #import "RSSwizzle.h"
 #import <objc/runtime.h>
@@ -80,7 +80,7 @@ static void swizzleNumber(Class classToSwizzle, int(^transformationBlock)(int)){
 
 #pragma mark - TESTS -
 
-@interface RSSwizzleTests : SenTestCase @end
+@interface RSSwizzleTests : XCTestCase @end
 
 @implementation RSSwizzleTests
 
@@ -165,7 +165,7 @@ static void swizzleNumber(Class classToSwizzle, int(^transformationBlock)(int)){
 {
     RSSwizzleTestClass_D *object = [RSSwizzleTestClass_D new];
     int res = [object calc:2];
-    STAssertTrue(res == ((2 * (-1) * 3) + 17) * 5 * 11 - 20, @"%d",res);
+    XCTAssertTrue(res == ((2 * (-1) * 3) + 17) * 5 * 11 - 20, @"%d",res);
 }
 
 #pragma mark - String Swizzling
@@ -183,7 +183,7 @@ static void swizzleNumber(Class classToSwizzle, int(^transformationBlock)(int)){
         return [res stringByAppendingString:@"DEF"];
     }), RSSwizzleModeAlways, NULL);
     
-    STAssertTrue([[a string] isEqualToString:@"ABCDEF"], nil);
+    XCTAssertTrue([[a string] isEqualToString:@"ABCDEF"]);
 }
 
 #pragma mark - Class Swizzling
@@ -198,9 +198,9 @@ static void swizzleNumber(Class classToSwizzle, int(^transformationBlock)(int)){
         return @([result doubleValue]* 2.);
     }));
     
-    STAssertEqualObjects(@(2.), [RSSwizzleTestClass_A sumFloat:0.5 withDouble:1.5 ], nil);
-    STAssertEqualObjects(@(4.), [RSSwizzleTestClass_B sumFloat:0.5 withDouble:1.5 ], nil);
-    STAssertEqualObjects(@(4.), [RSSwizzleTestClass_C sumFloat:0.5 withDouble:1.5 ], nil);
+    XCTAssertEqualObjects(@(2.), [RSSwizzleTestClass_A sumFloat:0.5 withDouble:1.5 ]);
+    XCTAssertEqualObjects(@(4.), [RSSwizzleTestClass_B sumFloat:0.5 withDouble:1.5 ]);
+    XCTAssertEqualObjects(@(4.), [RSSwizzleTestClass_C sumFloat:0.5 withDouble:1.5 ]);
 }
 
 #pragma mark - Test Assertions
@@ -214,12 +214,12 @@ static void swizzleNumber(Class classToSwizzle, int(^transformationBlock)(int)){
             originalIMP(self,selector);
         };
     };
-    STAssertThrows([RSSwizzle
+    XCTAssertThrows([RSSwizzle
                     swizzleInstanceMethod:selector
                     inClass:[RSSwizzleTestClass_A class]
                     newImpFactory:factoryBlock
                     mode:RSSwizzleModeAlways
-                    key:NULL], nil);
+                    key:NULL]);
 }
 
 -(void)testThrowsOnSwizzlingWithIncorrectImpType{
@@ -229,40 +229,40 @@ static void swizzleNumber(Class classToSwizzle, int(^transformationBlock)(int)){
     {
         return ^(__unsafe_unretained id self){};
     };
-    STAssertThrows([RSSwizzle
+    XCTAssertThrows([RSSwizzle
                     swizzleInstanceMethod:@selector(methodReturningBOOL)
                     inClass:[RSSwizzleTestClass_A class]
                     newImpFactory:voidNoArgFactory
                     mode:RSSwizzleModeAlways
-                    key:NULL], nil);
+                    key:NULL]);
     // Different arguments count
-    STAssertThrows([RSSwizzle
+    XCTAssertThrows([RSSwizzle
                     swizzleInstanceMethod:@selector(methodWithArgument:)
                     inClass:[RSSwizzleTestClass_A class]
                     newImpFactory:voidNoArgFactory
                     mode:RSSwizzleModeAlways
-                    key:NULL], nil);
+                    key:NULL]);
     // Different arguments type
     RSSwizzleImpFactoryBlock voidIntArgFactory =
     ^id(RSSwizzleInfo *swizzleInfo)
     {
         return ^int(__unsafe_unretained id self){ return 0; };
     };
-    STAssertThrows([RSSwizzle
+    XCTAssertThrows([RSSwizzle
                     swizzleInstanceMethod:@selector(methodWithArgument:)
                     inClass:[RSSwizzleTestClass_A class]
                     newImpFactory:voidIntArgFactory
                     mode:RSSwizzleModeAlways
-                    key:NULL], nil);
+                    key:NULL]);
 }
 
 -(void)testThrowsOnPassingIncorrectImpFactory{
-    STAssertThrows([RSSwizzle
+    XCTAssertThrows([RSSwizzle
                     swizzleInstanceMethod:@selector(methodWithArgument:)
                     inClass:[RSSwizzleTestClass_A class]
                     newImpFactory:^id(id x){ return nil; }
                     mode:RSSwizzleModeAlways
-                    key:NULL], nil);
+                    key:NULL]);
 }
 #endif
 
