@@ -8,10 +8,29 @@
 
 #import "RSSwizzle.h"
 #import <objc/runtime.h>
-#import <libkern/OSAtomic.h>
 
 #if !__has_feature(objc_arc)
 #error This code needs ARC. Use compiler option -fobjc-arc
+#endif
+
+#if (TARGET_OS_OSX && MAC_OS_X_VERSION_MIN_REQUIRED >= 101200) || (TARGET_OS_IOS && __IPHONE_OS_VERSION_MIN_REQUIRED >= 100000) || (TARGET_OS_WATCH && __WATCH_OS_VERSION_MIN_REQUIRED >= 30000) || (TARGET_OS_TV && __TV_OS_VERSION_MIN_REQUIRED >= 100000)
+#import <os/lock.h>
+
+#define RSUnfairLock                os_unfair_lock
+#define RS_UNFAIR_LOCK_INIT         OS_UNFAIR_LOCK_INIT
+#define RSUnfairLockLock(lock)      os_unfair_lock_lock(lock)
+#define RSUnfairLockUnlock(lock)    os_unfair_lock_unlock(lock)
+#define RSUnfairLockTry(lock)       os_unfair_lock_trylock(lock)
+
+#else
+#import <libkern/OSAtomic.h>
+
+#define RSUnfairLock                OSSpinLock
+#define RS_UNFAIR_LOCK_INIT         OS_SPINLOCK_INIT
+#define RSUnfairLockLock(lock)      OSSpinLockLock(lock)
+#define RSUnfairLockUnlock(lock)    OSSpinLockUnlock(lock)
+#define RSUnfairLockTry(lock)       OSSpinLockTry(lock)
+
 #endif
 
 #pragma mark - Block Helpers
@@ -196,7 +215,7 @@ static void swizzle(Class classToSwizzle,
     NSCAssert(blockIsAnImpFactoryBlock(factoryBlock),
              @"Wrong type of implementation factory block.");
     
-    __block OSSpinLock lock = OS_SPINLOCK_INIT;
+    __block RSUnfairLock lock = RS_UNFAIR_LOCK_INIT;
     // To keep things thread-safe, we fill in the originalIMP later,
     // with the result of the class_replaceMethod call below.
     __block IMP originalIMP = NULL;
@@ -206,9 +225,9 @@ static void swizzle(Class classToSwizzle,
         // It's possible that another thread can call the method between the call to
         // class_replaceMethod and its return value being set.
         // So to be sure originalIMP has the right value, we need a lock.
-        OSSpinLockLock(&lock);
+        RSUnfairLockLock(&lock);
         IMP imp = originalIMP;
-        OSSpinLockUnlock(&lock);
+        RSUnfairLockUnlock(&lock);
         
         if (NULL == imp){
             // If the class does not implement the method
@@ -244,9 +263,9 @@ static void swizzle(Class classToSwizzle,
     //
     // We need a lock to be sure that originalIMP has the right value in the
     // originalImpProvider block above.
-    OSSpinLockLock(&lock);
+    RSUnfairLockLock(&lock);
     originalIMP = class_replaceMethod(classToSwizzle, selector, newIMP, methodType);
-    OSSpinLockUnlock(&lock);
+    RSUnfairLockUnlock(&lock);
 }
 
 static NSMutableDictionary *swizzledClassesDictionary(){
