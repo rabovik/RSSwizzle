@@ -1,3 +1,5 @@
+#import <Foundation/Foundation.h>
+
 @interface RSTestsLog : NSObject
 +(void)log:(NSString *)string;
 +(void)clear;
@@ -5,6 +7,6 @@
 +(NSString *)logString;
 @end
 
-#define ASSERT_LOG_IS(STRING) STAssertTrue([RSTestsLog is:STRING], @"LOG IS @\"%@\" INSTEAD",[RSTestsLog logString])
+#define ASSERT_LOG_IS(STRING) XCTAssertTrue([RSTestsLog is:STRING], @"LOG IS @\"%@\" INSTEAD",[RSTestsLog logString])
 #define CLEAR_LOG() ([RSTestsLog clear])
 #define RSTestsLog(STRING) [RSTestsLog log:STRING]

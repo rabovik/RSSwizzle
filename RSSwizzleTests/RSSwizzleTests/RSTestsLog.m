@@ -1,5 +1,5 @@
 #import "RSTestsLog.h"
-#import <SenTestingKit/SenTestingKit.h>
+#import <XCTest/XCTest.h>
 
 @implementation RSTestsLog
 
@@ -24,7 +24,7 @@ static NSMutableString *_logString = nil;
 @end
 
 
-@interface RSTestsLogTests : SenTestCase @end
+@interface RSTestsLogTests : XCTestCase @end
 
 @implementation RSTestsLogTests
 
@@ -33,7 +33,7 @@ static NSMutableString *_logString = nil;
     RSTestsLog(@"A");
     RSTestsLog(@"B");
     RSTestsLog(@"C");
-    STAssertTrue([[RSTestsLog logString] isEqualToString:@"ABC"], @"%@",[RSTestsLog logString]);
+    XCTAssertTrue([[RSTestsLog logString] isEqualToString:@"ABC"], @"%@",[RSTestsLog logString]);
 }
 
 -(void)testAssertLogIs{
