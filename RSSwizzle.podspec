@@ -10,7 +10,7 @@ Pod::Spec.new do |s|
   s.osx.deployment_target = '10.7'
   s.tvos.deployment_target = '9.0'
   s.watchos.deployment_target = '2.0'
-  s.source_files = 'RSSwizzle', 'RSSwizzle/**/*.{h,m}'
+  s.source_files = 'RSSwizzle/**/*.{h,m}'
   s.frameworks = 'Foundation'
   s.requires_arc = true
 end
